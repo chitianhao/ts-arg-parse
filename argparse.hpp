@@ -21,22 +21,69 @@
   limitations under the License.
  */
 
-/*
-  need:
-  constructor of function
-  function type
-  usage method
-  help message & method
-  invoke and structure storing stuff after the parse
- */
+// steps: 1. store 2. parse 3. invoke 4. usage & help
 
 #pragma once
 
 #include <string>
 #include <vector>
+#include <functional>
+#include <string_view>
+#include <any>
 
 namespace ts
 {
+
+// // Attrib can be any type!
+// class Attrib
+// {
+// public:
+//   // constructors and destructors
+//   Attrib(const char *s) : _data(strdup(s)), _size(strlen(s)) {}
+//   Attrib(const char *s, std::size_t size) : _data(strdup(s)), _size(size) {}
+//   Attrib(const std::string &s) : _data(strdup(s.c_str())), _size(s.size()) {}
+//   ~Attrib() { delete _data; };
+
+//   // all types
+//   int get_int() { return atoi(_data); }
+//   int get_double() { return atof(_data); }
+//   // int get_int64_t() { return ink_atoi64(_data); }
+//   bool get_bool() { return (!strcmp(_data, "t") || !strcmp(_data, "T") || !strcmp(_data, "true")) ? true : false; }
+//   std::string get_string() { return std::string(_data); }
+//   char *get_char_ptr() { return strdup(_data); }
+
+//   // get the size of the Attrib
+//   std::size_t get_size() { return _size; }
+
+// private:
+//   char *_data = nullptr;
+//   std::size_t _size = 0;
+// };
+
+// option class: -a --arg
+class Option
+{
+public:
+  Option();
+  Option(std::string const &opt_name, std::string const &opt_key, std::string const &opt_description);
+  Option(std::string const &opt_name, std::string const &opt_key, std::string const &opt_description, std::string const &opt_envvar);
+  Option(std::string const &opt_name, std::string const &opt_key, std::string const &opt_description, std::string const &opt_arg_type, int opt_arg_num);
+  ~Option();
+
+private:
+  std::string _opt_name; // --arg
+  std::string _opt_key;  // -a
+  std::string _opt_description;
+  std::string _opt_arg_type;
+  int _opt_arg_num; // number of argument expected
+  std::string _opt_envvar;
+  /**
+  The data is a list of any type. It will be filled after parse()
+  */
+  std::vector<std::any> _data;
+
+  friend class ArgParser;
+};
 
 // base container for argparser
 class ArgParser
@@ -44,77 +91,63 @@ class ArgParser
   typedef ArgParser self; ///< Self reference type.
 
 public:
-  // option class: -a --arg
-  class Option
-  {
-  public:
-    Option();
-    Option(std::string const &name, std::string const &key, std::string const &description, std::string const &arg_type, int arg_num = 0);
-    ~Option();
-
-  private:
-    std::string _name;
-    std::string _key;
-    std::string _description;
-    std::string _arg_type;
-    int _arg_num;
-  }; // Class Option
-
-  // command class
-  class Command
-  {
-  public:
-    // default constructor
-    Command();
-    // constructor with arg
-    Command(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_arg_type, int cmd_arg_num = 0);
-    ~Command();
-
-    // TODO constructor with function
-
-    // option with arg
-    Option &add_suboption(std::string const &name, std::string const &key, std::string const &description, std::string const &arg_type, int arg_num = 0);
-    // option without arg
-    Option &add_suboption(std::string const &name, std::string const &key, std::string const &description);
-    // command with arg
-    Command &add_subcommand(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_arg_type, int cmd_arg_num = 0);
-    // command without arg
-    Command &add_subcommand(std::string const &cmd_name, std::string const &cmd_description);
-
-  protected:
-    std::string _cmd_name;
-    // command description
-    std::string _cmd_description;
-    // how many arguments expected
-    int _cmd_arg_num = 0;
-    // argument type
-    std::string _cmd_arg_type;
-    // option of this specified command
-    std::vector<Option> _cmd_option_list;
-    // list of subcommands
-    std::vector<Command> _subcommand_list;
-
-  }; // class Command
+  // using AryAction = std::function<int(int argc, const char *argv[])>;
+  // using NullaryAction = std::function<int()>;
+  using Function = std::function<int(int argc, const char **argv)>;
 
   // constructor
   ArgParser();
-  ArgParser(std::string const &description);
+  ArgParser(std::string const &name, std::string const &description);
+  ArgParser(std::string const &name, std::string const &description, std::string const &arg_type, int arg_num);
+  // TODO: a constructor with action(function)
+  ArgParser(std::string const &name, std::string const &description, Function const &f);
+  ArgParser(std::string const &name, std::string const &description, std::string const &arg_type, int arg_num, Function const &f);
+
   // desctructor
   ~ArgParser();
+
+  // first step is parse
+  void parse(int argc, const char **argv);
+  // second step is invoke
+  int invoke(int argc, const char **argv);
 
   // option with arg
   Option &add_option(std::string const &name, std::string const &key, std::string const &description, std::string const &arg_type, int arg_num = 0);
   // option without arg
   Option &add_option(std::string const &name, std::string const &key, std::string const &description);
   // command with arg
-  Command &add_command(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_arg_type, int cmd_arg_num = 0);
+  ArgParser &add_subcommand(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_arg_type, int cmd_arg_num = 0);
   // command without arg
-  Command &add_command(std::string const &cmd_name, std::string const &cmd_description);
+  ArgParser &add_subcommand(std::string const &cmd_name, std::string const &cmd_description);
+  // get certain command from the command list to deal with
+  ArgParser &get_subcommand(std::string const &cmd_name);
+
+  void help();
 
 protected:
+  // the parent of current parser
+  ArgParser *_parent = nullptr;
+  // information of the parser
+  std::string _name;
   std::string _description;
+  // list of all options of current parser
   std::vector<Option> _option_list;
-  std::vector<Command> _command_list;
+  // list of all subcommands of current parser
+  std::vector<ArgParser> _subcommand_list;
+  // expected argument
+  std::string _arg_type;
+  int _arg_num;
+  // function that should be invoked
+  Function _func;
+
+  std::string _envvar;
+
+  /**
+  The data is a list of any type. It will be filled after parse()
+  */
+  std::vector<std::any> _data;
+
+  friend class Option;
 }; // Class ArgParser
 
 } // namespace ts

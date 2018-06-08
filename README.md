@@ -19,3 +19,4 @@ traffic server executables
 Compilation
 ------------
 clang++(or g++) argparse.cpp main.cpp -o main -std=c++17
+On MAC: /usr/local/Cellar/llvm/6.0.0/bin/clang++ argparse.cpp main.cpp -o main -std=c++17

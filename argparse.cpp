@@ -22,86 +22,105 @@
  */
 
 #include "argparse.hpp"
+#include <iostream>
+#include <sstream>
 
 namespace ts
 {
+
+// constructor and destructor
+ts::Option::Option() {}
+
+ts::Option::~Option() {}
+
+ts::Option::Option(std::string const &opt_name, std::string const &opt_key, std::string const &opt_description)
+    : _opt_name(opt_name), _opt_key(opt_key), _opt_description(opt_description) {}
+
+ts::Option::Option(std::string const &opt_name, std::string const &opt_key, std::string const &opt_description, std::string const &opt_envvar)
+    : _opt_name(opt_name), _opt_key(opt_key), _opt_description(opt_description), _opt_envvar(opt_envvar) {}
+
+ts::Option::Option(std::string const &opt_name, std::string const &opt_key, std::string const &opt_description, std::string const &opt_arg_type, int opt_arg_num)
+    : _opt_name(opt_name), _opt_key(opt_key), _opt_description(opt_description), _opt_arg_type(opt_arg_type), _opt_arg_num(opt_arg_num) {}
+
 // constructor and destructor
 ArgParser::ArgParser() {}
+
 ArgParser::~ArgParser() {}
-ArgParser::ArgParser(std::string const &description)
+
+ArgParser::ArgParser(std::string const &name, std::string const &description)
+    : _name(name), _description(description) {}
+
+ArgParser::ArgParser(std::string const &name, std::string const &description, std::string const &arg_type, int arg_num)
+    : _name(name), _description(description), _arg_type(arg_type), _arg_num(arg_num) {}
+
+ArgParser::ArgParser(std::string const &name, std::string const &description, Function const &f)
+    : _name(name), _description(description)
 {
-    _description = description;
+    _func = f;
 }
 
-ArgParser::Option::Option() {}
-ArgParser::Option::~Option() {}
-ArgParser::Option::Option(std::string const &name, std::string const &key, std::string const &description, std::string const &arg_type, int arg_num)
+ArgParser::ArgParser(std::string const &name, std::string const &description, std::string const &arg_type, int arg_num, Function const &f)
+    : _name(name), _description(description), _arg_type(arg_type), _arg_num(arg_num)
 {
-    _name = name;
-    _key = key;
-    _description = description;
-    _arg_type = arg_type;
-    _arg_num = arg_num;
+    _func = f;
 }
 
 // option handling
-ArgParser::Option &ArgParser::add_option(std::string const &name, std::string const &key, std::string const &description, std::string const &arg_type, int arg_num)
+Option &ArgParser::add_option(std::string const &name, std::string const &key, std::string const &description, std::string const &arg_type, int arg_num)
 {
     _option_list.push_back(Option(name, key, description, arg_type, arg_num));
     return _option_list.back();
 }
 
-ArgParser::Option &ArgParser::add_option(std::string const &name, std::string const &key, std::string const &description)
+Option &ArgParser::add_option(std::string const &name, std::string const &key, std::string const &description)
 {
-    _option_list.push_back(Option(name, key, description, "", 0));
+    _option_list.push_back(Option(name, key, description));
     return _option_list.back();
 }
 
-ArgParser::Command &ArgParser::add_command(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_arg_type, int cmd_arg_num)
+ArgParser &ArgParser::add_subcommand(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_arg_type, int cmd_arg_num)
 {
-    _command_list.push_back(Command(cmd_name, cmd_description, cmd_arg_type, cmd_arg_num));
-    return _command_list.back();
-}
-
-ArgParser::Command &ArgParser::add_command(std::string const &cmd_name, std::string const &cmd_description)
-{
-    _command_list.push_back(Command(cmd_name, cmd_description, "", 0));
-    return _command_list.back();
-}
-
-ArgParser::Command::Command() {}
-ArgParser::Command::~Command() {}
-ArgParser::Command::Command(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_arg_type, int cmd_arg_num)
-{
-    _cmd_name = cmd_name;
-    _cmd_description = cmd_description;
-    _cmd_arg_type = cmd_arg_type;
-    _cmd_arg_num = cmd_arg_num;
-}
-
-// option handling
-ArgParser::Option &ArgParser::Command::add_suboption(std::string const &name, std::string const &key, std::string const &description, std::string const &arg_type, int arg_num)
-{
-    _cmd_option_list.push_back(Option(name, key, description, arg_type, arg_num));
-    return _cmd_option_list.back();
-}
-
-ArgParser::Option &ArgParser::Command::add_suboption(std::string const &name, std::string const &key, std::string const &description)
-{
-    _cmd_option_list.push_back(Option(name, key, description, "", 0));
-    return _cmd_option_list.back();
-}
-
-ArgParser::Command &ArgParser::Command::add_subcommand(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_arg_type, int cmd_arg_num)
-{
-    _subcommand_list.push_back(Command(cmd_name, cmd_description, cmd_arg_type, cmd_arg_num));
+    ArgParser parser = ArgParser(cmd_name, cmd_description, cmd_arg_type, cmd_arg_num);
+    parser._parent = this;
+    _subcommand_list.push_back(parser);
     return _subcommand_list.back();
 }
 
-ArgParser::Command &ArgParser::Command::add_subcommand(std::string const &cmd_name, std::string const &cmd_description)
+ArgParser &ArgParser::add_subcommand(std::string const &cmd_name, std::string const &cmd_description)
 {
-    _subcommand_list.push_back(Command(cmd_name, cmd_description, "", 0));
+    ArgParser parser = ArgParser(cmd_name, cmd_description, "", 0);
+    parser._parent = this;
+    _subcommand_list.push_back(parser);
     return _subcommand_list.back();
+}
+
+ArgParser &ArgParser::get_subcommand(std::string const &cmd_name)
+{
+    for (int i = 0; i < _subcommand_list.size(); i++)
+    {
+        if (_subcommand_list[i]._name == cmd_name)
+        {
+            return _subcommand_list[i];
+        }
+    }
+    std::ostringstream s;
+    s << "Command " << cmd_name << " not found";
+    exit(1);
+}
+
+void ArgParser::parse(int argc, const char **argv)
+{
+}
+
+int ArgParser::invoke(int argc, const char **argv)
+{
+    return _func(argc, argv);
+}
+
+// for temporary testing
+void ArgParser::help()
+{
+    std::cout << "help!" << std::endl;
 }
 
 } // namespace ts
