@@ -5,10 +5,10 @@ WIP Arg Parsing for ATS
 
 traffic server executables
 ------------
-- traffic_cache_tool: command, subcommand, option (command implemented: command.cc, command.h)
-- traffic_crashlog: option
-- traffic_ctl: command, subcommand, option, file arguments (command implemented: traffic_ctl.cc)
-- traffic_layout: command, option (command implemented: traffic_layout.cc) 
+- traffic_cache_tool: command, subcommand, option.
+- traffic_crashlog: option.
+- traffic_ctl: command, subcommand, option, file arguments.
+- traffic_layout: command, option.
 - traffic_logcat: option, file arguments.
 - traffic_logstats: option.
 - traffic_manager: option.
@@ -18,5 +18,5 @@ traffic server executables
 
 Compilation
 ------------
-clang++(or g++) argparse.cpp main.cpp -o main -std=c++17
-On MAC: /usr/local/Cellar/llvm/6.0.0/bin/clang++ argparse.cpp main.cpp -o main -std=c++17
+- Normal build: ``clang++(or g++) argparse.cpp main.cpp -o main -std=c++17``
+- On MAC: ``/usr/local/Cellar/llvm/6.0.0/bin/clang++ argparse.cpp main.cpp -o main -std=c++17``
