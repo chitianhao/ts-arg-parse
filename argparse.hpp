@@ -31,6 +31,8 @@
 #include <string_view>
 #include <vector>
 
+#define RESERVE_LIST_SIZE 128
+
 namespace ts {
 
 // // Attrib can be any type!
@@ -77,18 +79,19 @@ class Option {
   std::string _opt_name;  // --arg
   std::string _opt_key;   // -a
   std::string _opt_description;
-  std::string _opt_arg_type;
-  int _opt_arg_num;  // number of argument expected
-  std::string _opt_envvar;
+  std::string _opt_arg_type = "";
+  int _opt_arg_num = 0;          // number of argument expected
+  std::string _opt_envvar = "";  // stored envvar
+
   /**
-  The data is a list of any type. It will be filled after parse()
+  The data can be any type. It will be filled after parse()
   */
   std::any _opt_data;
 
   friend class ArgParser;
 };
 
-// base container for argparser
+// argparser class (nested set structure)
 class ArgParser {
   typedef ArgParser self;  ///< Self reference type.
 
@@ -115,59 +118,72 @@ class ArgParser {
   ~ArgParser();
 
   void append_cmd_data(std::vector<ArgParser> &list,
-                       const std::vector<std::string> &args);
+                       std::vector<std::string> &args);
   void append_option_data(std::vector<Option> &list,
-                          const std::vector<std::string> &args);
+                          std::vector<std::string> &args);
   // first step is parse
   void parse(int argc, const char **argv);
   // second step is invoke
   int invoke(int argc, const char **argv);
 
+  // option without arg
+  Option &add_option(std::string const &name, std::string const &key,
+                     std::string const &description);
   // option with arg
   Option &add_option(std::string const &name, std::string const &key,
                      std::string const &description, std::string const &envvar,
                      std::string const &arg_type, int arg_num = 0);
-  // option without arg
-  Option &add_option(std::string const &name, std::string const &key,
-                     std::string const &description);
+
+  // command without arg
+  ArgParser &add_subcommand(std::string const &cmd_name,
+                            std::string const &cmd_description);
   // command with arg
   ArgParser &add_subcommand(std::string const &cmd_name,
                             std::string const &cmd_description,
                             std::string const &cmd_envvar,
-                            std::string const &cmd_arg_type,
-                            int cmd_arg_num = 0);
-  // command without arg
+                            std::string const &cmd_arg_type, int cmd_arg_num);
+  // command without arg with function
   ArgParser &add_subcommand(std::string const &cmd_name,
-                            std::string const &cmd_description);
+                            std::string const &cmd_description,
+                            Function const &f);
+  // command without arg and function
+  ArgParser &add_subcommand(std::string const &cmd_name,
+                            std::string const &cmd_description,
+                            std::string const &cmd_envvar,
+                            std::string const &cmd_arg_type, int cmd_arg_num,
+                            Function const &f);
   // get certain command from the command list to deal with
   ArgParser &get_subcommand(std::string const &cmd_name);
 
   // TODO
   std::any &get_envvar(std::string const &type);
 
-  void help();
+  void help(const std::vector<std::string> &args = std::vector<std::string>());
   void version_message();
 
  protected:
+  std::vector<std::string> _argv;
+  void check_option(std::string const &name, std::string const &key);
+  void check_command(std::string const &name);
   // the parent of current parser
   ArgParser *_parent = nullptr;
   // information of the parser
   std::string _name;
   std::string _description;
-  // list of all options of current parser
-  std::vector<Option> _option_list;
   // list of all subcommands of current parser
   std::vector<ArgParser> _subcommand_list;
+  // list of all options of current parser
+  std::vector<Option> _option_list;
   // expected argument
-  std::string _arg_type;
-  int _arg_num;
+  std::string _arg_type = "";
+  int _arg_num = 0;
+  // stored envvar
+  std::string _envvar = "";
   // function that should be invoked
   Function _func;
 
-  std::string _envvar;
-
   /**
-  The data is a list of any type. It will be filled after parse()
+  The data can be any type. It will be filled after parse()
   */
   std::any _data;
 
