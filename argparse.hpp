@@ -35,32 +35,6 @@
 
 namespace ts {
 
-// // Attrib can be any type!
-// class Attrib
-// {
-// public:
-//   // constructors and destructors
-//   Attrib(const char *s) : _data(strdup(s)), _size(strlen(s)) {}
-//   Attrib(const char *s, std::size_t size) : _data(strdup(s)), _size(size) {}
-//   Attrib(const std::string &s) : _data(strdup(s.c_str())), _size(s.size()) {}
-//   ~Attrib() { delete _data; };
-
-//   // all types
-//   int get_int() { return atoi(_data); }
-//   int get_double() { return atof(_data); }
-//   // int get_int64_t() { return ink_atoi64(_data); }
-//   bool get_bool() { return (!strcmp(_data, "t") || !strcmp(_data, "T") ||
-//   !strcmp(_data, "true")) ? true : false; } std::string get_string() { return
-//   std::string(_data); } char *get_char_ptr() { return strdup(_data); }
-
-//   // get the size of the Attrib
-//   std::size_t get_size() { return _size; }
-
-// private:
-//   char *_data = nullptr;
-//   std::size_t _size = 0;
-// };
-
 // option class: -a --arg
 class Option {
  public:
@@ -69,24 +43,22 @@ class Option {
          std::string const &opt_description);
   Option(std::string const &opt_name, std::string const &opt_key,
          std::string const &opt_description, std::string const &opt_envvar,
-         std::string const &opt_arg_type, int opt_arg_num);
+         int opt_arg_num);
   ~Option();
 
-  // TODO
-  std::any get_envvar(std::string const &type);
+  std::string get_envvar();
+  std::vector<std::string> get_data();
 
  private:
+  void show_option_info();
   std::string _opt_name;  // --arg
   std::string _opt_key;   // -a
   std::string _opt_description;
-  std::string _opt_arg_type = "";
-  int _opt_arg_num = 0;          // number of argument expected
-  std::string _opt_envvar = "";  // stored envvar
+  int _opt_arg_num = 0;     // number of argument expected
+  std::string _opt_envvar;  // stored envvar
 
-  /**
-  The data can be any type. It will be filled after parse()
-  */
-  std::any _opt_data;
+  // data stored after parsing
+  std::vector<std::string> _opt_data;
 
   friend class ArgParser;
 };
@@ -104,27 +76,21 @@ class ArgParser {
   ArgParser();
   ArgParser(std::string const &name, std::string const &description);
   ArgParser(std::string const &name, std::string const &description,
-            std::string const &envvar, std::string const &arg_type,
-            int arg_num);
+            std::string const &envvar, int arg_num);
 
   // a constructor with action(function)
   ArgParser(std::string const &name, std::string const &description,
             Function const &f);
   ArgParser(std::string const &name, std::string const &description,
-            std::string const &envvar, std::string const &arg_type, int arg_num,
-            Function const &f);
+            std::string const &envvar, int arg_num, Function const &f);
 
   // desctructor
   ~ArgParser();
 
-  void append_cmd_data(std::vector<ArgParser> &list,
-                       std::vector<std::string> &args);
-  void append_option_data(std::vector<Option> &list,
-                          std::vector<std::string> &args);
   // first step is parse
-  void parse(int argc, const char **argv);
+  void parse(int argc = 0, const char **argv = nullptr);
   // second step is invoke
-  int invoke(int argc, const char **argv);
+  int invoke(int argc = 0, const char **argv = nullptr);
 
   // option without arg
   Option &add_option(std::string const &name, std::string const &key,
@@ -132,7 +98,7 @@ class ArgParser {
   // option with arg
   Option &add_option(std::string const &name, std::string const &key,
                      std::string const &description, std::string const &envvar,
-                     std::string const &arg_type, int arg_num = 0);
+                     int arg_num = 0);
 
   // command without arg
   ArgParser &add_subcommand(std::string const &cmd_name,
@@ -140,8 +106,7 @@ class ArgParser {
   // command with arg
   ArgParser &add_subcommand(std::string const &cmd_name,
                             std::string const &cmd_description,
-                            std::string const &cmd_envvar,
-                            std::string const &cmd_arg_type, int cmd_arg_num);
+                            std::string const &cmd_envvar, int cmd_arg_num);
   // command without arg with function
   ArgParser &add_subcommand(std::string const &cmd_name,
                             std::string const &cmd_description,
@@ -149,14 +114,17 @@ class ArgParser {
   // command without arg and function
   ArgParser &add_subcommand(std::string const &cmd_name,
                             std::string const &cmd_description,
-                            std::string const &cmd_envvar,
-                            std::string const &cmd_arg_type, int cmd_arg_num,
+                            std::string const &cmd_envvar, int cmd_arg_num,
                             Function const &f);
   // get certain command from the command list to deal with
   ArgParser &get_subcommand(std::string const &cmd_name);
 
-  // TODO
-  std::any &get_envvar(std::string const &type);
+  // get the environment variable
+  std::string get_envvar();
+  // get the data
+  std::vector<std::string> get_data();
+
+  void show_all_configuration();
 
   void help(const std::vector<std::string> &args = std::vector<std::string>());
   void version_message();
@@ -165,6 +133,13 @@ class ArgParser {
   std::vector<std::string> _argv;
   void check_option(std::string const &name, std::string const &key);
   void check_command(std::string const &name);
+  // void append_cmd_data(std::vector<ArgParser> &list,
+  //                      std::vector<std::string> &args);
+  // void append_option_data(std::vector<Option> &list,
+  //                         std::vector<std::string> &args);
+  void append_parser_data(std::vector<std::string> &args);
+  void append_option_data(std::vector<std::string> &args);
+  void show_parser_info();
   // the parent of current parser
   ArgParser *_parent = nullptr;
   // information of the parser
@@ -175,17 +150,14 @@ class ArgParser {
   // list of all options of current parser
   std::vector<Option> _option_list;
   // expected argument
-  std::string _arg_type = "";
   int _arg_num = 0;
   // stored envvar
-  std::string _envvar = "";
+  std::string _envvar;
   // function that should be invoked
   Function _func;
 
-  /**
-  The data can be any type. It will be filled after parse()
-  */
-  std::any _data;
+  // data stored after parsing
+  std::vector<std::string> _data;
 
   friend class Option;
 };  // Class ArgParser
