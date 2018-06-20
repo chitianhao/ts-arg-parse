@@ -108,8 +108,31 @@ void ArgParser::Command::check_option(std::string const& name,
   // find if existing in option list
   if (_option_list.find(name) != _option_list.end() ||
       _option_map.find(key) != _option_map.end()) {
-    std::cout << "option already exists: " + name << std::endl;
+    std::string msg;
+    if (_option_list.find(name) != _option_list.end()) {
+      msg = "long option '" + name;
+    } else {
+      msg = "short option '" + key;
+    }
+    std::cout << msg + "' already exists under current command: " + _name
+              << std::endl;
     exit(1);
+  }
+  // find recursively up to see if there is any conflict
+  Command* parent = _parent;
+  while (parent) {
+    if (parent->_option_list.find(name) != parent->_option_list.end() ||
+        parent->_option_map.find(key) != parent->_option_map.end()) {
+      std::string msg;
+      if (_option_list.find(name) != _option_list.end()) {
+        msg = "long option '" + name;
+      } else {
+        msg = "short option '" + key;
+      }
+      std::cout << msg + "' already exists in parent command" << std::endl;
+      exit(1);
+    }
+    parent = parent->_parent;
   }
 }
 
@@ -213,8 +236,9 @@ void ArgParser::show_parser_info() {
 
 // append the args of option to parsed data
 void ArgParser::Command::append_option_data(ArgParser& base, ParsedArgs& ret,
-                                            std::vector<std::string>& args) {
-  for (int i = 0; i < args.size(); i++) {
+                                            std::vector<std::string>& args,
+                                            int index) {
+  for (int i = index; i < args.size(); i++) {
     // output version or help message
     if (args[i] == "--version" || args[i] == "-V") {
       base.version_message();
@@ -222,9 +246,23 @@ void ArgParser::Command::append_option_data(ArgParser& base, ParsedArgs& ret,
     if (args[i] == "--help" || args[i] == "-h") {
       base.help_message();
     }
-    // find matches
-    if (_option_list.find(args[i]) != _option_list.end() ||
-        _option_map.find(args[i]) != _option_map.end()) {
+    // find matches of the arg
+    if (args[i][0] == '-' && args[i][1] == '-' &&
+        args[i].find('=') != std::string::npos) {
+      // deal with --args=
+      std::string option_name = args[i].substr(0, args[i].find_first_of('='));
+      if (_option_list.find(option_name) != _option_list.end()) {
+        ParserData option_data;
+        Option cur_option = _option_list[option_name];
+        option_data.arg_data.push_back(
+            args[i].substr(args[i].find_last_of('=') + 1));
+        args.erase(args.begin() + i);
+        ret._data_map[cur_option._opt_name] = option_data;
+        i -= 1;
+      }
+    } else if (_option_list.find(args[i]) != _option_list.end() ||
+               _option_map.find(args[i]) != _option_map.end()) {
+      // arg name match or key match
       ParserData option_data;
       Option cur_option;
       if (_option_list.find(args[i]) != _option_list.end()) {
@@ -233,6 +271,16 @@ void ArgParser::Command::append_option_data(ArgParser& base, ParsedArgs& ret,
         cur_option = _option_list[_option_map[args[i]]];
       }
       // handle the options
+      if (cur_option._opt_arg_num == INFINITE_ARG_NUM) {
+        // infinite arguments
+        for (int j = i + 1; j < args.size(); j++) {
+          option_data.arg_data.push_back(args[j]);
+        }
+        args.erase(args.begin() + i, args.end());
+        ret._data_map[cur_option._opt_name] = option_data;
+        return;
+      }
+      // normal finite number of argument handling
       for (int j = 0; j < cur_option._opt_arg_num; j++) {
         if (args.size() < i + j + 2 || args[i + j + 1].empty() ||
             args[i + j + 1][0] == '-') {
@@ -267,7 +315,7 @@ bool ArgParser::Command::append_data(ArgParser& base, ParsedArgs& ret,
       }
       conflict_flag = 1;
       // handle the option
-      append_option_data(base, ret, args);
+      append_option_data(base, ret, args, i);
       // when subcommand is called
       if (_subcommand_list.find(args[i + 1]) != _subcommand_list.end()) {
         args.erase(args.begin() + i);
@@ -275,6 +323,16 @@ bool ArgParser::Command::append_data(ArgParser& base, ParsedArgs& ret,
         return true;
       }
       // handle the args
+      if (_arg_num == INFINITE_ARG_NUM) {
+        // infinite arguments
+        for (int j = i + 1; j < args.size(); j++) {
+          cmd_data.arg_data.push_back(args[j]);
+        }
+        args.erase(args.begin() + i, args.end());
+        ret._data_map[_name] = cmd_data;
+        return true;
+      }
+      // normal finite number of argument handling
       for (int j = 0; j < _arg_num; j++) {
         if (args.size() < i + j + 2 || args[i + j + 1].empty() ||
             args[i + j + 1][0] == '-') {

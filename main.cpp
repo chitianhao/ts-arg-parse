@@ -13,17 +13,17 @@ int main(int, const char **argv) {
 
   // two basic commands
   ts::ArgParser::Command &init_command =
-      top_command.add_subcommand("init", "initialize traffic shit", "HOME", 1);
+      top_command.add_subcommand("init", "initialize traffic blabla", "HOME", 1);
   ts::ArgParser::Command &remove_command = top_command.add_subcommand(
-      "remove", "remove traffic shit", "REMOVE_ENV", 0);
+      "remove", "remove traffic blabla", "REMOVE_ENV", 0);
 
   init_command.add_option("--initoption", "-i", "some option of init");
   init_command.add_option("--initoption2", "-j", "init2 option", "ABC", 1);
-  init_command.add_subcommand("subinit", "sub initialize traffic shit");
-  init_command.add_subcommand("subinit2", "sub initialize traffic shit", "", 2)
+  init_command.add_subcommand("subinit", "sub initialize traffic blabla");
+  init_command.add_subcommand("subinit2", "sub initialize traffic blabla", "", 2)
       .add_option("--abc", "-x", "some testing", "", 1);
 
-  remove_command.add_subcommand("subremove", "sub remove traffic shit")
+  remove_command.add_subcommand("subremove", "sub remove traffic blabla")
       .add_subcommand("subsubremove", "sub sub remove");
   remove_command.add_option("--removeswitch", "-i", "some removeswitch");
 

@@ -29,7 +29,7 @@
 #include <unordered_map>
 #include <vector>
 
-#define RESERVE_LIST_SIZE 128
+#define INFINITE_ARG_NUM -1
 
 namespace ts {
 
@@ -38,23 +38,34 @@ struct ParserData {
   std::vector<std::string> arg_data;
 };
 
+// The class holding the stuff after parsing
 class ParsedArgs {
  public:
-  // TODO: some method to deal with the parsed args
-  // std::string get_env(std::string const &name) {
-  //   if (_data_map.find(name) != _data_map.end()) {
-  //     return _data_map[name].env_data;
-  //   } else {
-  //     return "";
-  //   }
-  // }
-  // std::vector<std::string> get(std::string const &name) {
-  //   if (_data_map.find(name) != _data_map.end()) {
-  //     return _data_map[name].arg_data;
-  //   } else {
-  //     return std::vector<std::string>();
-  //   }
-  // }
+  // get the related env variable given the name of command/option
+  std::string get_env(std::string const &name) {
+    if (_data_map.find(name) != _data_map.end()) {
+      return _data_map[name].env_data;
+    } else {
+      return "";
+    }
+  }
+  // get the related arguments given the name of command/option
+  std::vector<std::string> get_args(std::string const &name) {
+    if (_data_map.find(name) != _data_map.end()) {
+      return _data_map[name].arg_data;
+    } else {
+      return std::vector<std::string>();
+    }
+  }
+  // see if certain command/option is called
+  bool called(std::string const &name) {
+    if (_data_map.find(name) != _data_map.end()) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+  // TODO: some other method to deal with types of the parsed args
 
   // show what we have in the parsed data
   void show_all_configuration() {
@@ -70,12 +81,15 @@ class ParsedArgs {
     }
   }
 
+ private:
   // "command/option": command data
   // key value pared stored only when they are called
   std::unordered_map<std::string, ParserData> _data_map;
+  friend class ArgParser;
 };
 
-// base class of the parser
+
+// base wrapper class of the parser
 class ArgParser {
   typedef ArgParser self;  ///< Self reference type.
  public:
@@ -107,9 +121,9 @@ class ArgParser {
     std::string _opt_envvar;       // stored envvar
 
     friend class ArgParser;
-    friend class Command;
   };
 
+  // class for commands in a nested way
   class Command {
     typedef Command self;
 
@@ -150,7 +164,7 @@ class ArgParser {
     bool append_data(ArgParser &me, ParsedArgs &ret,
                      std::vector<std::string> &args);
     void append_option_data(ArgParser &base, ParsedArgs &ret,
-                            std::vector<std::string> &args);
+                            std::vector<std::string> &args, int index);
     // the parent of current command
     Command *_parent = nullptr;
     // information of the command
@@ -172,7 +186,6 @@ class ArgParser {
 
    protected:
     friend class ArgParser;
-    friend class Option;
   };
 
   // return the _top_level_command to deal with
@@ -191,6 +204,7 @@ class ArgParser {
 
   friend class Option;
   friend class Command;
+  friend class ParsedArgs;
 };
 
 }  // namespace ts
