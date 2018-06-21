@@ -41,45 +41,18 @@ struct ParserData {
 // The class holding the stuff after parsing
 class ParsedArgs {
  public:
+  ParsedArgs();
+  ~ParsedArgs();
   // get the related env variable given the name of command/option
-  std::string get_env(std::string const &name) {
-    if (_data_map.find(name) != _data_map.end()) {
-      return _data_map[name].env_data;
-    } else {
-      return "";
-    }
-  }
+  std::string get_env(std::string const &name);
   // get the related arguments given the name of command/option
-  std::vector<std::string> get_args(std::string const &name) {
-    if (_data_map.find(name) != _data_map.end()) {
-      return _data_map[name].arg_data;
-    } else {
-      return std::vector<std::string>();
-    }
-  }
+  std::vector<std::string> get_args(std::string const &name);
   // see if certain command/option is called
-  bool called(std::string const &name) {
-    if (_data_map.find(name) != _data_map.end()) {
-      return true;
-    } else {
-      return false;
-    }
-  }
+  bool called(std::string const &name);
   // TODO: some other method to deal with types of the parsed args
 
   // show what we have in the parsed data
-  void show_all_configuration() {
-    for (auto it : _data_map) {
-      std::cout << "name: " + it.first << std::endl;
-      std::string s;
-      s = "args value:";
-      for (int i = 0; i < it.second.arg_data.size(); i++) {
-        s += " " + it.second.arg_data[i];
-      }
-      std::cout << s << std::endl;
-      std::cout << "env value: " + it.second.env_data << std::endl << std::endl;
-    }
-  }
+  void show_all_configuration() const;
 
  private:
   // "command/option": command data
@@ -88,8 +61,7 @@ class ParsedArgs {
   friend class ArgParser;
 };
 
-
-// base wrapper class of the parser
+// basic container class of the parser
 class ArgParser {
   typedef ArgParser self;  ///< Self reference type.
  public:
@@ -113,7 +85,7 @@ class ArgParser {
     ~Option();
 
    protected:
-    void show_option_info();
+    void show_option_info() const;
     std::string _opt_name;         // --arg
     std::string _opt_key;          // -a
     std::string _opt_description;  // description
@@ -155,16 +127,18 @@ class ArgParser {
 
     // get certain command from the command list to deal with
     Command &get_subcommand(std::string const &cmd_name);
+    void add_example_usage(std::string const &usage);
 
    protected:
     // some helper methods
-    void check_option(std::string const &name, std::string const &key);
-    void check_command(std::string const &name);
-    void show_command_info();
+    void check_option(std::string const &name, std::string const &key) const;
+    void check_command(std::string const &name) const;
+    void show_command_info() const;
     bool append_data(ArgParser &me, ParsedArgs &ret,
                      std::vector<std::string> &args);
     void append_option_data(ArgParser &base, ParsedArgs &ret,
                             std::vector<std::string> &args, int index);
+    void output_command(std::ostream &out, std::string const &prefix) const;
     // the parent of current command
     Command *_parent = nullptr;
     // information of the command
@@ -183,24 +157,30 @@ class ArgParser {
     int _arg_num = 0;
     // stored envvar
     std::string _envvar;
+    // an example usage can be added for the help message
+    std::string _example_usage;
 
    protected:
     friend class ArgParser;
   };
 
+  // add the usage to global_usage for help_message()
+  void add_global_usage(std::string const &usage);
   // return the _top_level_command to deal with
   Command &top_command();
   // main parsing function
   ParsedArgs parse(const char **argv);
   // show all information of the parser
-  void show_parser_info();
+  void show_parser_info() const;
   // help & version
-  void help_message();
-  void version_message();
+  void help_message() const;
+  void version_message() const;
 
  protected:
   std::vector<std::string> _argv;  // for the use of parsing and help
   Command _top_level_command;
+
+  std::string _global_usage;
 
   friend class Option;
   friend class Command;
