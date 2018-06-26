@@ -1,6 +1,6 @@
 /** @file
 
-  arg parsing for ATS
+  Powerful and easy-to-use command line parsing for ATS
 
   @section license License
 
@@ -28,9 +28,11 @@ namespace ts
 {
 ArgParser::ArgParser() {}
 
-ArgParser::ArgParser(std::string const &name, std::string const &description, std::string const &envvar, int arg_num)
+ArgParser::ArgParser(std::string const &name, std::string const &description, std::string const &envvar, int arg_num,
+                     Function const &f)
 {
-  _top_level_command = ArgParser::Command(name, description, envvar, arg_num);
+  // initialize _top_level_command according to the provided message
+  _top_level_command = ArgParser::Command(name, description, envvar, arg_num, f);
 }
 
 ArgParser::~ArgParser() {}
@@ -47,14 +49,16 @@ ArgParser::add_global_usage(std::string const &usage)
   _global_usage = usage;
 }
 
+// a graceful way to output help message
 void
 ArgParser::help_message() const
 {
+  // four steps for the help message
   // 1. output global usage
   if (_global_usage.size() > 0) {
-    std::cout << "Usage: " + _global_usage << std::endl;
+    std::cout << "\nUsage: " + _global_usage << std::endl;
   }
-  // find the level to output help message
+  // find the exact level to output help message
   ArgParser::Command command = _top_level_command;
   for (int i = 1; i < _argv.size(); i++) {
     if (command._subcommand_list.find(_argv[i]) == command._subcommand_list.end()) {
@@ -75,7 +79,12 @@ ArgParser::help_message() const
       if (!it.second._opt_key.empty()) {
         msg = msg + ", " + it.second._opt_key;
       }
-      std::cout << msg << ": " << it.second._opt_description << std::endl;
+      // create the indent for output
+      std::string indent;
+      for (int i = 0; i < 30 - msg.size(); i++) {
+        indent += " ";
+      }
+      std::cout << msg << ": " << indent << it.second._opt_description << std::endl;
     }
   }
   // 4. output example usage
@@ -88,6 +97,7 @@ ArgParser::help_message() const
 void
 ArgParser::version_message() const
 {
+  // unified version message of ATS
   /*
   AppVersionInfo appVersionInfo;
   appVersionInfo.setup(PACKAGE_NAME, _name, PACKAGE_VERSION, __DATE__, __TIME__, BUILD_MACHINE, BUILD_PERSON, "");
@@ -96,7 +106,7 @@ ArgParser::version_message() const
   exit(0);
 }
 
-// Main logic of parsing
+// Top level call of parsing
 ParsedArgs
 ArgParser::parse(const char **argv)
 {
@@ -114,8 +124,7 @@ ArgParser::parse(const char **argv)
   _argv[0]                 = _argv[0].substr(_argv[0].find_last_of('/') + 1);
   _top_level_command._name = _argv[0];
 
-  // start of parsing
-  ParsedArgs ret;
+  ParsedArgs ret; // the parsed arg object to return
   StringArray args = _argv;
   // call the recrusive parse method in Command
   _top_level_command.parse(*this, ret, args);
@@ -131,15 +140,14 @@ ArgParser::parse(const char **argv)
   return ret;
 }
 
-//===================== Command class =============================
+//=========================== Command class ================================
 ArgParser::Command::Command() {}
 
 ArgParser::Command::~Command() {}
 
-ArgParser::Command::Command(std::string const &name, std::string const &description) : _name(name), _description(description) {}
-
-ArgParser::Command::Command(std::string const &name, std::string const &description, std::string const &envvar, int arg_num)
-  : _name(name), _description(description), _envvar(envvar), _arg_num(arg_num)
+ArgParser::Command::Command(std::string const &name, std::string const &description, std::string const &envvar, int arg_num,
+                            Function const &f)
+  : _name(name), _description(description), _envvar(envvar), _arg_num(arg_num), _f(f)
 {
 }
 
@@ -194,7 +202,19 @@ ArgParser::Command::check_command(std::string const &name) const
   }
 }
 
-// add new options
+// add new options without args
+ArgParser::Option &
+ArgParser::Command::add_option(std::string const &name, std::string const &key, std::string const &description)
+{
+  check_option(name, key);
+  _option_list[name] = {name, key == "-" ? "" : key, description};
+  if (key != "-" && !key.empty()) {
+    _option_map[key] = name;
+  }
+  return _option_list[name];
+}
+
+// add new options with args
 ArgParser::Option &
 ArgParser::Command::add_option(std::string const &name, std::string const &key, std::string const &description,
                                std::string const &envvar, int arg_num)
@@ -207,54 +227,63 @@ ArgParser::Command::add_option(std::string const &name, std::string const &key, 
   return _option_list[name];
 }
 
-ArgParser::Option &
-ArgParser::Command::add_option(std::string const &name, std::string const &key, std::string const &description)
+// add sub-command without args
+ArgParser::Command &
+ArgParser::Command::add_subcommand(std::string const &cmd_name, std::string const &cmd_description)
 {
-  check_option(name, key);
-  _option_list[name] = {name, key == "-" ? "" : key, description};
-  if (key != "-" && !key.empty()) {
-    _option_map[key] = name;
-  }
-  return _option_list[name];
+  check_command(cmd_name);
+  ArgParser::Command command = ArgParser::Command(cmd_name, cmd_description, "", 0, nullptr);
+  command._parent            = this;
+  _subcommand_list[cmd_name] = command;
+  return _subcommand_list[cmd_name];
 }
 
-// add new subcommands
+// add sub-command with args
 ArgParser::Command &
 ArgParser::Command::add_subcommand(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar,
                                    int cmd_arg_num)
 {
   check_command(cmd_name);
-  ArgParser::Command command = ArgParser::Command(cmd_name, cmd_description, cmd_envvar, cmd_arg_num);
+  ArgParser::Command command = ArgParser::Command(cmd_name, cmd_description, cmd_envvar, cmd_arg_num, nullptr);
   command._parent            = this;
   _subcommand_list[cmd_name] = command;
   return _subcommand_list[cmd_name];
 }
 
+// add sub-command without args and function
 ArgParser::Command &
-ArgParser::Command::add_subcommand(std::string const &cmd_name, std::string const &cmd_description)
+ArgParser::Command::add_subcommand(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar,
+                                   int cmd_arg_num, Function const &f)
 {
   check_command(cmd_name);
-  ArgParser::Command command = ArgParser::Command(cmd_name, cmd_description, "", 0);
+  ArgParser::Command command = ArgParser::Command(cmd_name, cmd_description, cmd_envvar, cmd_arg_num, f);
   command._parent            = this;
   _subcommand_list[cmd_name] = command;
   return _subcommand_list[cmd_name];
 }
 
-ArgParser::Command &
-ArgParser::Command::get_subcommand(std::string const &cmd_name)
+void
+ArgParser::Command::add_example_usage(std::string const &usage)
 {
-  if (_subcommand_list.find(cmd_name) != _subcommand_list.end()) {
-    return _subcommand_list[cmd_name];
-  }
-  // search recursively down
-  for (auto it : _subcommand_list) {
-    return it.second.get_subcommand(cmd_name);
-  }
-  std::cerr << "Error: command " + cmd_name + " not found";
-  exit(1);
+  _example_usage = usage;
 }
 
-// need polish
+// method used by help_message()
+void
+ArgParser::Command::output_command(std::ostream &out, std::string const &prefix) const
+{
+  // create indent
+  std::string indent;
+  for (int i = 0; i < 30 - (prefix.size() + _name.size()); i++) {
+    indent += " ";
+  }
+  out << prefix << _name << ": " << indent << _description << std::endl;
+  // recursive call
+  for (auto it : _subcommand_list) {
+    it.second.output_command(out, "  " + prefix);
+  }
+}
+
 void
 ArgParser::show_parser_info() const
 {
@@ -284,6 +313,7 @@ handle_args(ArgParser &base, ParsedArgs &ret, StringArray &args, ParserData &dat
     }
     data.arg_data.push_back(args[index + j + 1]);
   }
+  // erase the used arguments and append the data to the return structure
   args.erase(args.begin() + index, args.begin() + index + arg_num + 1);
   ret.append(name, data);
   index -= 1;
@@ -330,47 +360,7 @@ append_option_data(ArgParser &base, ParsedArgs &ret, StringArray &args,
   }
 }
 
-// append the args of command to parsed data
-void
-ArgParser::Command::append_data(ArgParser &base, ParsedArgs &ret, StringArray &args) const
-{
-  // iterate through all arguments
-  for (int i = 0; i < args.size(); i++) {
-    if (_name == args[i]) {
-      // get ENV var first
-      ParserData cmd_data;
-      if (_envvar.size() > 0) {
-        cmd_data.env_data = getenv(_envvar.c_str()) ? getenv(_envvar.c_str()) : "";
-      }
-      // handle the option
-      append_option_data(base, ret, args, _option_list, _option_map, i);
-      // when subcommand is called, continue
-      if (_subcommand_list.find(args[i + 1]) != _subcommand_list.end()) {
-        args.erase(args.begin() + i);
-        ret.append(_name, cmd_data);
-        return;
-      }
-      handle_args(base, ret, args, cmd_data, _name, _arg_num, i);
-    }
-  }
-}
-
-void
-ArgParser::Command::add_example_usage(std::string const &usage)
-{
-  _example_usage = usage;
-}
-
-// method used by help_message()
-void
-ArgParser::Command::output_command(std::ostream &out, std::string const &prefix) const
-{
-  out << prefix << _name << ": " << _description << std::endl;
-  for (auto it : _subcommand_list) {
-    it.second.output_command(out, "  " + prefix);
-  }
-}
-
+// Main recursive logic of Parsing
 void
 ArgParser::Command::parse(ArgParser &base, ParsedArgs &ret, StringArray &args)
 {
@@ -385,12 +375,33 @@ ArgParser::Command::parse(ArgParser &base, ParsedArgs &ret, StringArray &args)
       conflict_flag = 1;
     }
   }
-  append_data(base, ret, args);
-  // if it is called
-  if (ret._data_map.find(_name) != ret._data_map.end()) {
-    for (auto it : _subcommand_list) {
-      it.second.parse(base, ret, args);
+  // iterate through all arguments
+  for (int i = 0; i < args.size(); i++) {
+    if (_name == args[i]) {
+      // get ENV var first
+      ParserData cmd_data;
+      if (_envvar.size() > 0) {
+        cmd_data.env_data = getenv(_envvar.c_str()) ? getenv(_envvar.c_str()) : "";
+      }
+      // handle the option
+      append_option_data(base, ret, args, _option_list, _option_map, i);
+      // handle the action
+      if (_f) {
+        ret._action = _f;
+      }
+      // when subcommand is called, continue
+      if (_subcommand_list.find(args[i + 1]) != _subcommand_list.end()) {
+        args.erase(args.begin() + i);
+        ret.append(_name, cmd_data);
+        break;
+      }
+      handle_args(base, ret, args, cmd_data, _name, _arg_num, i);
+      return;
     }
+  }
+  // recursively call subcommand
+  for (auto it : _subcommand_list) {
+    it.second.parse(base, ret, args);
   }
 }
 
@@ -421,7 +432,7 @@ ArgParser::Command::show_command_info() const
   }
 }
 
-//===================== ParsedArgs class =============================
+//=========================== ParsedArgs class ================================
 
 ParsedArgs::ParsedArgs() {}
 ParsedArgs::~ParsedArgs() {}
@@ -474,6 +485,19 @@ ParsedArgs::show_all_configuration() const
     }
     std::cout << msg << std::endl;
     std::cout << "env value: " + it.second.env_data << std::endl << std::endl;
+  }
+}
+
+// invoke the function with the args
+int
+ParsedArgs::invoke()
+{
+  if (_action) {
+    // call the std::functin
+    return _action();
+  } else {
+    std::cerr << "Error: no function to invoke";
+    exit(1);
   }
 }
 

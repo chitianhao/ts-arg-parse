@@ -1,6 +1,6 @@
 /** @file
 
-  arg parsing for ATS
+  Powerful and easy-to-use command line parsing for ATS
 
   @section license License
 
@@ -24,143 +24,181 @@
 #pragma once
 
 #include <iostream>
-#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <functional>
 
+// For unspecified-number args
 #define INFINITE_ARG_NUM -1
 
 namespace ts
 {
+// Some type def
 using StringArray = std::vector<std::string>;
+using Function    = std::function<int()>;
 
+/// Struct holding both the ENV and String arguments
 struct ParserData {
   std::string env_data;
   StringArray arg_data;
 };
 
-// The class holding the stuff after parsing
+// The class holding all the parsed data after ArgParser::parse()
 class ParsedArgs
 {
 public:
   ParsedArgs();
   ~ParsedArgs();
-  // get the related env variable given the name of command/option
-  std::string get_env(std::string const &name) const;
-  // get the related arguments given the name of command/option
-  StringArray get_args(std::string const &name) const;
-  // see if certain command/option is called
-  bool called(std::string const &name) const;
-  // append stuff to the datamap
-  void append(std::string const &key, ParserData const &value);
-  // TODO: some other method to deal with types of the parsed args
 
-  // show what we have in the parsed data
+  /** Get the related env variable given the name of command/option.
+      @return The ENV variable associated with certain command/option.
+  */
+  std::string get_env(std::string const &name) const;
+  /** Get the related arguments given the name of command/option.
+      @return The parsed arguments associated with certain command/option.
+  */
+  StringArray get_args(std::string const &name) const;
+  /** To check if certain command/option is called
+      @return true if called, else false
+  */
+  bool called(std::string const &name) const;
+  // Append key value pairs to the datamap
+  void append(std::string const &key, ParserData const &value);
+  // Print all we have in the parsed data to the console
   void show_all_configuration() const;
+  /** Invoke the function associated with the parsed command.
+      @return The return value of the executed command (int).
+  */
+  int invoke();
+  // TODO: Some other method to deal with types of the parsed args
+  // get_args_int, get_args_long, get_args_bool ...
 
 private:
-  // a map of all the called parsed args/data
-  // key: "command/option", value: ENV and args
+  // A map of all the called parsed args/data
+  // Key: "command/option", value: ENV and args
   std::unordered_map<std::string, ParserData> _data_map;
+  // The function associated. invoke() will call this func
+  Function _action;
   friend class ArgParser;
 };
 
-// basic container class of the parser
+// Basic container class of the parser
 class ArgParser
 {
-  typedef ArgParser self; ///< Self reference type.
 public:
-  // option class: e.x. --arg -a
+  // Option structure: e.x. --arg -a
+  // Contains all information about certain option(--switch)
   struct Option {
-    std::string _opt_name;        // --arg
-    std::string _opt_key;         // -a
+    std::string _opt_name;        // long option: --arg
+    std::string _opt_key;         // short option: -a
     std::string _opt_description; // help description
-    std::string _opt_envvar;      // stored envvar
+    std::string _opt_envvar;      // stored ENV variable
     int _opt_arg_num = 0;         // number of argument expected
   };
 
-  // class for commands in a nested way
+  // Class for commands in a nested way
   class Command
   {
-    typedef Command self;
-
   public:
-    // constructor
+    // Constructor
     Command();
-    Command(std::string const &name, std::string const &description);
-    Command(std::string const &name, std::string const &description, std::string const &envvar, int arg_num);
-
-    // desctructor
+    Command(std::string const &name, std::string const &description, std::string const &envvar, int arg_num, Function const &f);
+    // Desctructor
     ~Command();
 
-    // option without arg
+    /** Add an option to current command without arguments
+        @return The Option object.
+    */
     Option &add_option(std::string const &name, std::string const &key, std::string const &description);
-    // option with arg
+    /** Add an option to current command with arguments
+        @return The Option object.
+    */
     Option &add_option(std::string const &name, std::string const &key, std::string const &description, std::string const &envvar,
                        int arg_num = 0);
 
-    // command with nothing
+    /** Three ways of adding a sub-command to current command:
+     * 1. Without arguments.
+     * 2. With arguments.
+     * 3. With arguments and function
+        @return The new sub-command instance.
+    */
     Command &add_subcommand(std::string const &cmd_name, std::string const &cmd_description);
-    // command with arg, ENV
     Command &add_subcommand(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar,
                             int cmd_arg_num);
-
-    // get certain command from the command list to deal with
-    Command &get_subcommand(std::string const &cmd_name);
+    Command &add_subcommand(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar,
+                            int cmd_arg_num, Function const &f);
+    // add an example usage of current command for the help message
     void add_example_usage(std::string const &usage);
 
   protected:
-    // some helper methods
+    // Helper method for add_option
     void check_option(std::string const &name, std::string const &key) const;
+    // Helper method for add_subcommand
     void check_command(std::string const &name) const;
+    // Helper method for ArgParser::show_parser_info
     void show_command_info() const;
-    void parse(ArgParser &base, ParsedArgs &ret, StringArray &args);
-    void append_data(ArgParser &me, ParsedArgs &ret, StringArray &args) const;
+    // Helper method for ArgParser::help_message
     void output_command(std::ostream &out, std::string const &prefix) const;
+    // Helper method for ArgParser::parse
+    void parse(ArgParser &base, ParsedArgs &ret, StringArray &args);
 
-    // the parent of current command
+    // The parent of current command
     Command *_parent = nullptr;
-    // information of the command
+    // The command name and help message
     std::string _name;
     std::string _description;
+
+    // Expected argument number
+    int _arg_num = 0;
+    // Stored Env variable
+    std::string _envvar;
+    // An example usage can be added for the help message
+    std::string _example_usage;
+    // Function associated with this command
+    Function _f;
+
     // list of all subcommands of current command
-    // key: command name
+    // Key: command name. Value: Command object
     std::unordered_map<std::string, Command> _subcommand_list;
     // list of all options of current command
-    // key: option name
+    // Key: option name. Value: Option object
     std::unordered_map<std::string, Option> _option_list;
-    // <short option: long option> map for fast searching
+
+    // Map for fast searching: <short option: long option>
     std::unordered_map<std::string, std::string> _option_map;
-    // expected argument
-    int _arg_num = 0;
-    // stored envvar
-    std::string _envvar;
-    // an example usage can be added for the help message
-    std::string _example_usage;
 
   protected:
     friend class ArgParser;
   };
-
+  // Base class constructor and destructor
   ArgParser();
-  ArgParser(std::string const &name, std::string const &description, std::string const &envvar, int arg_num);
+  ArgParser(std::string const &name, std::string const &description, std::string const &envvar, int arg_num, Function const &f);
   ~ArgParser();
-  // return the _top_level_command to deal with
+
+  /** Get the top level command object to deal with
+      @return The _top_level_command
+  */
   Command &top_command();
-  // main parsing function
+  /** Main parsing function
+      @return The ParsedArgs object available for program using
+  */
   ParsedArgs parse(const char **argv);
-  // show all information of the parser
+  // Show all information(command, option, envvar ...) of the parser
   void show_parser_info() const;
-  // help & version message
+  // THE help & version messages
   void help_message() const;
   void version_message() const;
-  // add the usage to global_usage for help_message()
+  // Add the usage to global_usage for help_message()
+  // Example: traffic_blabla [--SWITCH [ARG]]
   void add_global_usage(std::string const &usage);
 
 protected:
-  StringArray _argv; // for the use of parsing and help
+  // Converted from 'const char **argv' for the use of parsing and help
+  StringArray _argv;
+  // the top level command object for program use
   Command _top_level_command;
+  // global usage of the program
   std::string _global_usage;
 
   friend class Command;
