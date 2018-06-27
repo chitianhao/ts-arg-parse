@@ -186,7 +186,7 @@ public:
   ParsedArgs parse(const char **argv);
   // Show all information(command, option, envvar ...) of the parser
   void show_parser_info() const;
-  // THE help & version messages
+  // The help & version messages
   void help_message() const;
   void version_message() const;
   // Add the usage to global_usage for help_message()

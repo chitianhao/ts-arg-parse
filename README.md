@@ -7,7 +7,7 @@ ArgParser is powerful and easy-to-use command line Parsing for ATS.
 The program defines what it requires by adding commands and options.
 Then ArgParser will figure out what is related from the command line.
 All parsed arguments and function will be put in ParsedArgs available
-for user to use.
+for users to use.
 
 Create a parser
 ------------
@@ -16,11 +16,10 @@ The parser can be created simply by calling: <br />
 ```
 ts::ArgParser parser
 ```
-or
+or initialize with some arguments: name, help description, environment variable, argument number expected, function:
 ```
 ts::ArgParser parser("name", "description", "ENV_VAR", 0, &function)
 ```
-The arguments required are: name, help description, environment variable, argument number expected, function.
 
 To add the usage for the help message of this program:
 ```
@@ -34,7 +33,7 @@ So the top level command should be called first to be dealt with:
 ```
 ts::ArgParser::Command &top_command = parser.top_command()
 ```
-Then we can perform following operations on the top level command.
+Then we can perform all kinds of operations on the top level command.
 
 To add subcommands to the current command:
 ```
@@ -42,16 +41,16 @@ top_command.add_subcommand("command", "description")
 top_command.add_subcommand("command", "description", "ENV_VAR", 0)
 top_command.add_subcommand("command", "description", "ENV_VAR", 0, &function)
 ```
-This function call returns the new sub-command instance.
+This function call returns the new sub-command instance. (0 is number of argument)
 
 To add options to the current command:
 ```
 top_command.add_option("--switch", "-s", "switch description")
 top_command.add_option("--switch", "-s", "switch description", "", 0)
 ```
-This function call returns the new Option instance.
+This function call returns the new Option instance. (0 is number of argument)
 
-We can use the following way to add subcommand or option:
+We can also use the following way to add subcommand or option:
 ```
 top_command.add_subcommand("init", "description").add_subcommand("subinit", "description")
 ```
@@ -60,20 +59,36 @@ or
 ts::ArgParser::Command &init_command = top_command.add_subcommand("init", "description")
 init_command.add_subcommand("subinit", "description")
 ```
-In this case, subinit is the subcommand of init.
+In this case, subinit is the subcommand of init. Option is added the same way as commands.
 
 Parsing arguments
 ------------
 ArgParser parses arguments through the ``parse()`` method. This will inspect the command line and walk through it.
-A ParsedArg object will be returned holding key value pairs all the parsed data and the function.
+A ParsedArg object will built up from attributes parsed out of the command line holding key-value pairs all the parsed data and the function.
 
 Invoke functions
 ------------
-To invoke the function associated, we can perform it by simply calling ``invoke()`` method from the ParsedArg object after the parsing.
+To invoke the function associated, we can perform it by simply calling ``invoke()`` method from the ParsedArg object after the parsing. The function can be lambda.
 
-Helper methods
+ParsedArgs Class
 ------------
-There are some helper method for debugging and understanding.
+The ParsedArgs is the class holding the parsed arguments and function to invoke. It basically constains a function to invoke and a private map holding key value pairs. The key is the command or option name string and the value is the Parsed data object which contains the environment variable and arguments that belongs to this certain command or option.
+
+Methods description:
+
+- ``get_env(std::string const &name)`` will return the ENV variable given the name of command or option
+- ``get_args(std::string const &name)`` will return the arguments string array given the name of command or option
+- ``called(std::string const &name)`` is able to check if certain command or option is called
+- ``append(std::string const &key, ParserData const &value)`` is able to append key-value pairs to the map
+
+Help and Version messages
+------------
+Help message will show up when wrong using of the program is detected or ``--help`` option found. <br />
+Version message is defined unified in ArgParser::version_message().
+
+Other Helper methods
+------------
+There are some helper methods for debugging and understanding.
 
 ``ts::ArgParser::show_parser_info()`` is able to show information of all the commands and option we added to the parser.
 
@@ -88,7 +103,7 @@ This program will have such functionality:
 - Command ``func`` will call ``function()`` and this command takes 2 argument.
 - Command ``func2`` will call ``function2(int num)``.
 - Command ``init`` has subcommand ``subinit`` and option ``--path`` which take 1 argument.
-- Command ``remove`` has option ``--path`` which takes 1 argument and has ``HOME`` as environment variable.
+- Command ``remove`` has option ``--path`` which takes 1 argument and has ``HOME`` as the environment variable.
 
 ```
 int function() {
@@ -123,4 +138,4 @@ int main (int, const char **argv) {
 
 Compilation
 ------------
- ``clang++(or g++) argparse.cpp main.cpp -o main -std=c++17``
+After including catch.hpp: ``clang++(or g++) ArgParser.cc test_ArgParser.cc -o test -std=c++17``

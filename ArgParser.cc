@@ -21,7 +21,10 @@
   limitations under the License.
  */
 
-#include "argparse.hpp"
+#include "ArgParser.h"
+// #include "ink_file.h"
+// #include "I_Version.h"
+
 #include <iostream>
 
 namespace ts
@@ -60,7 +63,7 @@ ArgParser::help_message() const
   }
   // find the exact level to output help message
   ArgParser::Command command = _top_level_command;
-  for (int i = 1; i < _argv.size(); i++) {
+  for (unsigned long i = 1; i < _argv.size(); i++) {
     if (command._subcommand_list.find(_argv[i]) == command._subcommand_list.end()) {
       break;
     }
@@ -81,7 +84,7 @@ ArgParser::help_message() const
       }
       // create the indent for output
       std::string indent;
-      for (int i = 0; i < 30 - msg.size(); i++) {
+      for (unsigned long i = 0; i < 30 - msg.size(); i++) {
         indent += " ";
       }
       std::cout << msg << ": " << indent << it.second._opt_description << std::endl;
@@ -100,10 +103,10 @@ ArgParser::version_message() const
   // unified version message of ATS
   /*
   AppVersionInfo appVersionInfo;
-  appVersionInfo.setup(PACKAGE_NAME, _name, PACKAGE_VERSION, __DATE__, __TIME__, BUILD_MACHINE, BUILD_PERSON, "");
-  ink_fputln(stdout, appinfo->FullVersionInfoStr);
-  */
+  appVersionInfo.setup(PACKAGE_NAME, _argv[0].c_str(), PACKAGE_VERSION, __DATE__, __TIME__, BUILD_MACHINE, BUILD_PERSON, "");
+  ink_fputln(stdout, appVersionInfo.FullVersionInfoStr);
   exit(0);
+  */
 }
 
 // Top level call of parsing
@@ -112,6 +115,7 @@ ArgParser::parse(const char **argv)
 {
   // deal with argv first
   int size = 0;
+  _argv.clear();
   while (argv[size]) {
     _argv.push_back(argv[size]);
     size++;
@@ -131,7 +135,7 @@ ArgParser::parse(const char **argv)
   // if there is anything left, then output usage
   if (!args.empty()) {
     std::string msg = "Unkown command, option or args:";
-    for (int i = 0; i < args.size(); i++) {
+    for (unsigned long i = 0; i < args.size(); i++) {
       msg = msg + " '" + args[i] + "'";
     }
     std::cout << msg << std::endl;
@@ -147,7 +151,7 @@ ArgParser::Command::~Command() {}
 
 ArgParser::Command::Command(std::string const &name, std::string const &description, std::string const &envvar, int arg_num,
                             Function const &f)
-  : _name(name), _description(description), _envvar(envvar), _arg_num(arg_num), _f(f)
+  : _name(name), _description(description), _arg_num(arg_num), _envvar(envvar), _f(f)
 {
 }
 
@@ -207,7 +211,7 @@ ArgParser::Option &
 ArgParser::Command::add_option(std::string const &name, std::string const &key, std::string const &description)
 {
   check_option(name, key);
-  _option_list[name] = {name, key == "-" ? "" : key, description};
+  _option_list[name] = {name, key == "-" ? "" : key, description, "", 0};
   if (key != "-" && !key.empty()) {
     _option_map[key] = name;
   }
@@ -274,7 +278,7 @@ ArgParser::Command::output_command(std::ostream &out, std::string const &prefix)
 {
   // create indent
   std::string indent;
-  for (int i = 0; i < 30 - (prefix.size() + _name.size()); i++) {
+  for (unsigned long i = 0; i < 30 - (prefix.size() + _name.size()); i++) {
     indent += " ";
   }
   out << prefix << _name << ": " << indent << _description << std::endl;
@@ -293,12 +297,12 @@ ArgParser::show_parser_info() const
 
 // helper method to handle the arguments and put them nicely in data
 static void
-handle_args(ArgParser &base, ParsedArgs &ret, StringArray &args, ParserData &data, std::string const &name, int arg_num, int &index)
+handle_args(ArgParser &base, ParsedArgs &ret, StringArray &args, ParserData &data, std::string const &name, int arg_num, unsigned long &index)
 {
   // handle the args
   if (arg_num == INFINITE_ARG_NUM) {
     // infinite arguments
-    for (int j = index + 1; j < args.size(); j++) {
+    for (unsigned long j = index + 1; j < args.size(); j++) {
       data.arg_data.push_back(args[j]);
     }
     args.erase(args.begin() + index, args.end());
@@ -326,14 +330,7 @@ append_option_data(ArgParser &base, ParsedArgs &ret, StringArray &args,
                    std::unordered_map<std::string, ArgParser::Option> const &option_list,
                    std::unordered_map<std::string, std::string> const &option_map, int index)
 {
-  for (int i = index; i < args.size(); i++) {
-    // output version or help message
-    if (args[i] == "--version" || args[i] == "-V") {
-      base.version_message();
-    }
-    if (args[i] == "--help" || args[i] == "-h") {
-      base.help_message();
-    }
+  for (unsigned long i = index; i < args.size(); i++) {
     // find matches of the arg
     if (args[i][0] == '-' && args[i][1] == '-' && args[i].find('=') != std::string::npos) {
       // deal with --args=
@@ -348,6 +345,13 @@ append_option_data(ArgParser &base, ParsedArgs &ret, StringArray &args,
       }
     } else if (option_list.find(args[i]) != option_list.end() || option_map.find(args[i]) != option_map.end()) {
       // arg name match or key match
+      // output version or help message
+      if (args[i] == "--version" || args[i] == "-V") {
+        base.version_message();
+      }
+      if (args[i] == "--help" || args[i] == "-h") {
+        base.help_message();
+      }
       ParserData option_data;
       ArgParser::Option cur_option;
       if (option_list.find(args[i]) != option_list.end()) {
@@ -366,7 +370,7 @@ ArgParser::Command::parse(ArgParser &base, ParsedArgs &ret, StringArray &args)
 {
   // check for conflict commands
   int conflict_flag = 0;
-  for (int i = 0; i < args.size(); i++) {
+  for (unsigned long i = 0; i < args.size(); i++) {
     if (_subcommand_list.find(args[i]) != _subcommand_list.end()) {
       if (conflict_flag == 1) {
         std::cout << "Error: Multiple commands found" << std::endl;
@@ -376,7 +380,7 @@ ArgParser::Command::parse(ArgParser &base, ParsedArgs &ret, StringArray &args)
     }
   }
   // iterate through all arguments
-  for (int i = 0; i < args.size(); i++) {
+  for (unsigned long i = 0; i < args.size(); i++) {
     if (_name == args[i]) {
       // get ENV var first
       ParserData cmd_data;
@@ -480,7 +484,7 @@ ParsedArgs::show_all_configuration() const
     std::cout << "name: " + it.first << std::endl;
     std::string msg;
     msg = "args value:";
-    for (int i = 0; i < it.second.arg_data.size(); i++) {
+    for (unsigned long i = 0; i < it.second.arg_data.size(); i++) {
       msg += " " + it.second.arg_data[i];
     }
     std::cout << msg << std::endl;
