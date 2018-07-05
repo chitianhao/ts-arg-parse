@@ -28,9 +28,10 @@
 #include <unordered_map>
 #include <vector>
 #include <functional>
+#include <string_view>
 
 // For unspecified-number args
-#define INFINITE_ARG_NUM -1
+static constexpr unsigned INFINITE_ARG_NUM = ~0;
 
 namespace ts
 {
@@ -59,6 +60,10 @@ public:
       @return The parsed arguments associated with certain command/option.
   */
   StringArray get_args(std::string const &name) const;
+  /** Get the argument at certain index given the name of command/option.
+      @return The parsed argument associated with certain command/option.
+  */
+  std::string get_arg(std::string const &name, unsigned index) const;
   /** To check if certain command/option is called
       @return true if called, else false
   */
@@ -73,7 +78,7 @@ public:
   int invoke();
   // TODO: Some other method to deal with types of the parsed args
   // get_args_int, get_args_long, get_args_bool ...
-
+  
 private:
   // A map of all the called parsed args/data
   // Key: "command/option", value: ENV and args
@@ -90,11 +95,11 @@ public:
   // Option structure: e.x. --arg -a
   // Contains all information about certain option(--switch)
   struct Option {
-    std::string _opt_name;        // long option: --arg
-    std::string _opt_key;         // short option: -a
-    std::string _opt_description; // help description
-    std::string _opt_envvar;      // stored ENV variable
-    int _opt_arg_num = 0;         // number of argument expected
+    std::string name;        // long option: --arg
+    std::string key;         // short option: -a
+    std::string description; // help description
+    std::string envvar;      // stored ENV variable
+    unsigned arg_num = 0;         // number of argument expected
   };
 
   // Class for commands in a nested way
@@ -103,7 +108,7 @@ public:
   public:
     // Constructor
     Command();
-    Command(std::string const &name, std::string const &description, std::string const &envvar, int arg_num, Function const &f);
+    Command(std::string const &name, std::string const &description, std::string const &envvar, unsigned arg_num, Function const &f);
     // Desctructor
     ~Command();
 
@@ -115,7 +120,7 @@ public:
         @return The Option object.
     */
     Option &add_option(std::string const &name, std::string const &key, std::string const &description, std::string const &envvar,
-                       int arg_num = 0);
+                       unsigned arg_num = 0);
 
     /** Three ways of adding a sub-command to current command:
      * 1. Without arguments.
@@ -125,9 +130,9 @@ public:
     */
     Command &add_subcommand(std::string const &cmd_name, std::string const &cmd_description);
     Command &add_subcommand(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar,
-                            int cmd_arg_num);
+                            unsigned cmd_arg_num);
     Command &add_subcommand(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar,
-                            int cmd_arg_num, Function const &f);
+                            unsigned cmd_arg_num, Function const &f);
     // add an example usage of current command for the help message
     void add_example_usage(std::string const &usage);
 
@@ -150,7 +155,7 @@ public:
     std::string _description;
 
     // Expected argument number
-    int _arg_num = 0;
+    unsigned _arg_num = 0;
     // Stored Env variable
     std::string _envvar;
     // An example usage can be added for the help message
@@ -173,7 +178,7 @@ public:
   };
   // Base class constructor and destructor
   ArgParser();
-  ArgParser(std::string const &name, std::string const &description, std::string const &envvar, int arg_num, Function const &f);
+  ArgParser(std::string_view name, std::string_view description, std::string_view envvar, unsigned arg_num, Function const &f);
   ~ArgParser();
 
   /** Get the top level command object to deal with

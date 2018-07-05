@@ -24,10 +24,8 @@
 #define CATCH_CONFIG_MAIN
 
 #include "catch.hpp"
-// #include "ts/ArgParser.h"
+// #include <ts/ArgParser.h>
 #include "ArgParser.h"
-
-#include <iostream>
 
 TEST_CASE("Parsing test", "[parse]")
 {
@@ -58,6 +56,7 @@ TEST_CASE("Parsing test", "[parse]")
   REQUIRE(parsed_data.called("--globalx") == true);
   REQUIRE(parsed_data.called("--initoption") == true);
   REQUIRE(parsed_data.called("a") == false);
+  REQUIRE(parsed_data.get_env("init").size() != 0);
   REQUIRE(parsed_data.get_args("init").size() == 1);
   REQUIRE(parsed_data.get_args("init")[0] == "a");
   REQUIRE(parsed_data.get_args("--globalx").size() == 2);
