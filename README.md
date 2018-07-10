@@ -31,32 +31,32 @@ Add commands and options
 All commands and options are dealt with in the top level command. <br />
 So the top level command should be called first to be dealt with:
 ```
-ts::ArgParser::Command &top_command = parser.top_command()
+ts::ArgParser::Command &base_command = parser.base_command()
 ```
 Then we can perform all kinds of operations on the top level command.
 
 To add subcommands to the current command:
 ```
-top_command.add_subcommand("command", "description")
-top_command.add_subcommand("command", "description", "ENV_VAR", 0)
-top_command.add_subcommand("command", "description", "ENV_VAR", 0, &function)
+base_command.add_subcommand("command", "description")
+base_command.add_subcommand("command", "description", "ENV_VAR", 0)
+base_command.add_subcommand("command", "description", "ENV_VAR", 0, &function)
 ```
 This function call returns the new sub-command instance. (0 is number of argument)
 
 To add options to the current command:
 ```
-top_command.add_option("--switch", "-s", "switch description")
-top_command.add_option("--switch", "-s", "switch description", "", 0)
+base_command.add_option("--switch", "-s", "switch description")
+base_command.add_option("--switch", "-s", "switch description", "", 0)
 ```
 This function call returns the new Option instance. (0 is number of argument)
 
 We can also use the following way to add subcommand or option:
 ```
-top_command.add_subcommand("init", "description").add_subcommand("subinit", "description")
+base_command.add_subcommand("init", "description").add_subcommand("subinit", "description")
 ```
 or
 ```
-ts::ArgParser::Command &init_command = top_command.add_subcommand("init", "description")
+ts::ArgParser::Command &init_command = base_command.add_subcommand("init", "description")
 init_command.add_subcommand("subinit", "description")
 ```
 In this case, subinit is the subcommand of init. Option is added the same way as commands.
@@ -117,17 +117,17 @@ int function2(int num) {
 int main (int, const char **argv) {
     ts::ArgParser parser;
     parser.add_global_usage("traffic_blabla [some stuff]");
-    ts::ArgParser::Command &top_command = parser.top_command();
+    ts::ArgParser::Command &base_command = parser.base_command();
 
-    top_command.add_option("--switch", "-s", "top level switch");
-    top_command.add_subcommand("func", "some function", "", 2, &function);
-    top_command.add_subcommand("func2", "some function2", "", 0, [&]() { return function2(100); });
+    base_command.add_option("--switch", "-s", "top level switch");
+    base_command.add_subcommand("func", "some function", "", 2, &function);
+    base_command.add_subcommand("func2", "some function2", "", 0, [&]() { return function2(100); });
 
-    ts::ArgParser::Command &init_command = top_command.add_subcommand("init", "initialize");
+    ts::ArgParser::Command &init_command = base_command.add_subcommand("init", "initialize");
     init_command.add_option("--path", "-p", "specify the path", "", 1);
     init_command.add_subcommand("subinit", "sub initialize");
 
-    top_command.add_subcommand("remove", "remove things").add_option("--path", "-p", "specify the path", "HOME", 1);
+    base_command.add_subcommand("remove", "remove things").add_option("--path", "-p", "specify the path", "HOME", 1);
     
     ts::ParsedArgs parsed_data = parser.parse(argv);
     parsed_data.invoke();

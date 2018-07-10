@@ -32,13 +32,13 @@ TEST_CASE("Parsing test", "[parse]")
   // initialize and construct the parser
   ts::ArgParser parser;
   parser.add_global_usage("traffic_blabla [--SWITCH]");
-  ts::ArgParser::Command &top_command = parser.top_command();
+  ts::ArgParser::Command &base_command = parser.base_command();
 
-  top_command.add_option("--globalx", "-x", "global switch x", "", 2);
-  top_command.add_option("--globaly", "-y", "global switch y");
+  base_command.add_option("--globalx", "-x", "global switch x", "", 2);
+  base_command.add_option("--globaly", "-y", "global switch y");
 
-  ts::ArgParser::Command &init_command   = top_command.add_subcommand("init", "initialize traffic blabla", "HOME", 1, nullptr);
-  ts::ArgParser::Command &remove_command = top_command.add_subcommand("remove", "remove traffic blabla");
+  ts::ArgParser::Command &init_command   = base_command.add_subcommand("init", "initialize traffic blabla", "HOME", 1, nullptr);
+  ts::ArgParser::Command &remove_command = base_command.add_subcommand("remove", "remove traffic blabla");
 
   init_command.add_option("--initoption", "-i", "init option");
   init_command.add_option("--initoption2", "-j", "init2 option", "", 1);
@@ -103,11 +103,11 @@ TEST_CASE("Invoke test", "[invoke]")
   int num = 1;
 
   parser.add_global_usage("traffic_blabla [--SWITCH]");
-  ts::ArgParser::Command &top_command = parser.top_command();
+  ts::ArgParser::Command &base_command = parser.base_command();
   // function by reference
-  top_command.add_subcommand("func", "some test function 1", "", 0, &test_method_1);
+  base_command.add_subcommand("func", "some test function 1", "", 0, &test_method_1);
   // lambda
-  top_command.add_subcommand("func2", "some test function 2", "", 0, [&]() { return test_method_2(num); });
+  base_command.add_subcommand("func2", "some test function 2", "", 0, [&]() { return test_method_2(num); });
 
   ts::ParsedArgs parsed_data;
 

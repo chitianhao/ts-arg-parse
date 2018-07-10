@@ -41,7 +41,7 @@ ArgParser::ArgParser(std::string_view name, std::string_view description, std::s
 ArgParser::~ArgParser() {}
 
 ArgParser::Command &
-ArgParser::top_command()
+ArgParser::base_command()
 {
   return _top_level_command;
 }
@@ -64,10 +64,11 @@ ArgParser::help_message() const
   // find the exact level to output help message
   ArgParser::Command command = _top_level_command;
   for (unsigned i = 1; i < _argv.size(); i++) {
-    if (command._subcommand_list.find(_argv[i]) == command._subcommand_list.end()) {
+    auto it = command._subcommand_list.find(_argv[i]);
+    if (it == command._subcommand_list.end()) {
       break;
     }
-    ArgParser::Command tmp = command._subcommand_list[_argv[i]];
+    ArgParser::Command tmp = it->second;
     command                = tmp;
   }
   // 2. output subcommands
@@ -166,9 +167,11 @@ ArgParser::Command::check_option(std::string const &name, std::string const &key
     exit(1);
   }
   // find if existing in option list
-  if (_option_list.find(name) != _option_list.end() || _option_map.find(key) != _option_map.end()) {
+  auto list_it = _option_list.find(name);
+  auto map_it  = _option_map.find(key);
+  if (list_it != _option_list.end() || map_it != _option_map.end()) {
     std::string msg;
-    if (_option_list.find(name) != _option_list.end()) {
+    if (list_it != _option_list.end()) {
       msg = "Error: long option '" + name;
     } else {
       msg = "Error: short option '" + key;
@@ -328,31 +331,36 @@ append_option_data(ArgParser &base, ParsedArgs &ret, StringArray &args,
     if (args[i][0] == '-' && args[i][1] == '-' && args[i].find('=') != std::string::npos) {
       // deal with --args=
       std::string option_name = args[i].substr(0, args[i].find_first_of('='));
-      if (option_list.find(option_name) != option_list.end() && option_list.at(option_name).arg_num == 1) {
+      auto it                 = option_list.find(option_name);
+      if (it != option_list.end() && it->second.arg_num == 1) {
         ParserData option_data;
-        ArgParser::Option cur_option = option_list.at(option_name);
+        ArgParser::Option cur_option = it->second;
         option_data.arg_data.push_back(args[i].substr(args[i].find_last_of('=') + 1));
         args.erase(args.begin() + i);
         ret.append(cur_option.name, option_data);
         i -= 1;
       }
-    } else if (option_list.find(args[i]) != option_list.end() || option_map.find(args[i]) != option_map.end()) {
-      // arg name match or key match
-      // output version or help message
-      if (args[i] == "--version" || args[i] == "-V") {
-        base.version_message();
+    } else {
+      auto list_it = option_list.find(args[i]);
+      auto map_it  = option_map.find(args[i]);
+      if (list_it != option_list.end() || map_it != option_map.end()) {
+        // arg name match or key match
+        // output version or help message
+        if (args[i] == "--version" || args[i] == "-V") {
+          base.version_message();
+        }
+        if (args[i] == "--help" || args[i] == "-h") {
+          base.help_message();
+        }
+        ParserData option_data;
+        ArgParser::Option cur_option;
+        if (list_it != option_list.end()) {
+          cur_option = list_it->second;
+        } else {
+          cur_option = option_list.at(map_it->second);
+        }
+        handle_args(base, ret, args, option_data, cur_option.name, cur_option.arg_num, i);
       }
-      if (args[i] == "--help" || args[i] == "-h") {
-        base.help_message();
-      }
-      ParserData option_data;
-      ArgParser::Option cur_option;
-      if (option_list.find(args[i]) != option_list.end()) {
-        cur_option = option_list.at(args[i]);
-      } else {
-        cur_option = option_list.at(option_map.at(args[i]));
-      }
-      handle_args(base, ret, args, option_data, cur_option.name, cur_option.arg_num, i);
     }
   }
 }
@@ -437,8 +445,9 @@ ParsedArgs::~ParsedArgs() {}
 std::string
 ParsedArgs::get_env(std::string const &name) const
 {
-  if (_data_map.find(name) != _data_map.end()) {
-    return _data_map.at(name).env_data;
+  auto it = _data_map.find(name);
+  if (it != _data_map.end()) {
+    return it->second.env_data;
   } else {
     return "";
   }
@@ -446,8 +455,9 @@ ParsedArgs::get_env(std::string const &name) const
 StringArray
 ParsedArgs::get_args(std::string const &name) const
 {
-  if (_data_map.find(name) != _data_map.end()) {
-    return _data_map.at(name).arg_data;
+  auto it = _data_map.find(name);
+  if (it != _data_map.end()) {
+    return it->second.arg_data;
   } else {
     return StringArray();
   }
@@ -456,11 +466,12 @@ ParsedArgs::get_args(std::string const &name) const
 std::string
 ParsedArgs::get_arg(std::string const &name, unsigned index) const
 {
-  if (_data_map.find(name) != _data_map.end() && !_data_map.at(name).arg_data.empty()) {
-    if (index >= _data_map.at(name).arg_data.size()) {
+  auto it = _data_map.find(name);
+  if (it != _data_map.end() && !it->second.arg_data.empty()) {
+    if (index >= it->second.arg_data.size()) {
       return "";
     }
-    return _data_map.at(name).arg_data[index];
+    return it->second.arg_data[index];
   } else {
     return "";
   }

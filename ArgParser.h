@@ -184,7 +184,7 @@ public:
   /** Get the top level command object to deal with
       @return The _top_level_command
   */
-  Command &top_command();
+  Command &base_command();
   /** Main parsing function
       @return The ParsedArgs object available for program using
   */
