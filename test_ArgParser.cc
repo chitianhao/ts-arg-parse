@@ -32,22 +32,21 @@ TEST_CASE("Parsing test", "[parse]")
   // initialize and construct the parser
   ts::ArgParser parser;
   parser.add_global_usage("traffic_blabla [--SWITCH]");
-  ts::ArgParser::Command &base_command = parser.base_command();
 
-  base_command.add_option("--globalx", "-x", "global switch x", "", 2);
-  base_command.add_option("--globaly", "-y", "global switch y");
+  parser.add_option("--globalx", "-x", "global switch x", "", 2);
+  parser.add_option("--globaly", "-y", "global switch y");
 
-  ts::ArgParser::Command &init_command   = base_command.add_subcommand("init", "initialize traffic blabla", "HOME", 1, nullptr);
-  ts::ArgParser::Command &remove_command = base_command.add_subcommand("remove", "remove traffic blabla");
+  ts::ArgParser::Command &init_command   = parser.add_command("init", "initialize traffic blabla", "HOME", 1, nullptr);
+  ts::ArgParser::Command &remove_command = parser.add_command("remove", "remove traffic blabla");
 
   init_command.add_option("--initoption", "-i", "init option");
   init_command.add_option("--initoption2", "-j", "init2 option", "", 1);
-  init_command.add_subcommand("subinit", "sub initialize traffic blabla", "", 2, nullptr)
+  init_command.add_command("subinit", "sub initialize traffic blabla", "", 2, nullptr)
     .add_option("--subinitopt", "-s", "sub init option");
 
-  remove_command.add_subcommand("subremove", "sub remove traffic blabla").add_subcommand("subsubremove", "sub sub remove");
+  remove_command.add_command("subremove", "sub remove traffic blabla").add_command("subsubremove", "sub sub remove");
 
-  ts::ParsedArgs parsed_data;
+  ts::Arguments parsed_data;
 
   const char *argv1[] = {"traffic_blabla", "init", "a", "--initoption", "--globalx", "x", "y", NULL};
 
@@ -103,13 +102,12 @@ TEST_CASE("Invoke test", "[invoke]")
   int num = 1;
 
   parser.add_global_usage("traffic_blabla [--SWITCH]");
-  ts::ArgParser::Command &base_command = parser.base_command();
   // function by reference
-  base_command.add_subcommand("func", "some test function 1", "", 0, &test_method_1);
+  parser.add_command("func", "some test function 1", "", 0, &test_method_1);
   // lambda
-  base_command.add_subcommand("func2", "some test function 2", "", 0, [&]() { return test_method_2(num); });
+  parser.add_command("func2", "some test function 2", "", 0, [&]() { return test_method_2(num); });
 
-  ts::ParsedArgs parsed_data;
+  ts::Arguments parsed_data;
 
   const char *argv1[] = {"traffic_blabla", "func", NULL};
 

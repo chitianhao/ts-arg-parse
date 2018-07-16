@@ -40,10 +40,64 @@ ArgParser::ArgParser(std::string_view name, std::string_view description, std::s
 
 ArgParser::~ArgParser() {}
 
-ArgParser::Command &
-ArgParser::base_command()
+// add new options without args
+ArgParser::Option &
+ArgParser::add_option(std::string const &name, std::string const &key, std::string const &description)
 {
-  return _top_level_command;
+  _top_level_command.check_option(name, key);
+  _top_level_command._option_list[name] = {name, key == "-" ? "" : key, description, "", 0};
+  if (key != "-" && !key.empty()) {
+    _top_level_command._option_map[key] = name;
+  }
+  return _top_level_command._option_list[name];
+}
+
+// add new options with args
+ArgParser::Option &
+ArgParser::add_option(std::string const &name, std::string const &key, std::string const &description, std::string const &envvar,
+                      unsigned arg_num)
+{
+  _top_level_command.check_option(name, key);
+  _top_level_command._option_list[name] = {name, key == "-" ? "" : key, description, envvar, arg_num};
+  if (key != "-" && !key.empty()) {
+    _top_level_command._option_map[key] = name;
+  }
+  return _top_level_command._option_list[name];
+}
+
+// add sub-command without args
+ArgParser::Command &
+ArgParser::add_command(std::string const &cmd_name, std::string const &cmd_description)
+{
+  _top_level_command.check_command(cmd_name);
+  ArgParser::Command command                    = ArgParser::Command(cmd_name, cmd_description, "", 0, nullptr);
+  command._parent                               = &_top_level_command;
+  _top_level_command._subcommand_list[cmd_name] = command;
+  return _top_level_command._subcommand_list[cmd_name];
+}
+
+// add sub-command with args
+ArgParser::Command &
+ArgParser::add_command(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar,
+                       unsigned cmd_arg_num)
+{
+  _top_level_command.check_command(cmd_name);
+  ArgParser::Command command                    = ArgParser::Command(cmd_name, cmd_description, cmd_envvar, cmd_arg_num, nullptr);
+  command._parent                               = &_top_level_command;
+  _top_level_command._subcommand_list[cmd_name] = command;
+  return _top_level_command._subcommand_list[cmd_name];
+}
+
+// add sub-command without args and function
+ArgParser::Command &
+ArgParser::add_command(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar,
+                       unsigned cmd_arg_num, Function const &f)
+{
+  _top_level_command.check_command(cmd_name);
+  ArgParser::Command command                    = ArgParser::Command(cmd_name, cmd_description, cmd_envvar, cmd_arg_num, f);
+  command._parent                               = &_top_level_command;
+  _top_level_command._subcommand_list[cmd_name] = command;
+  return _top_level_command._subcommand_list[cmd_name];
 }
 
 void
@@ -107,7 +161,7 @@ ArgParser::version_message() const
 }
 
 // Top level call of parsing
-ParsedArgs
+Arguments
 ArgParser::parse(const char **argv)
 {
   // deal with argv first
@@ -125,7 +179,7 @@ ArgParser::parse(const char **argv)
   _argv[0]                 = _argv[0].substr(_argv[0].find_last_of('/') + 1);
   _top_level_command._name = _argv[0];
 
-  ParsedArgs ret; // the parsed arg object to return
+  Arguments ret; // the parsed arg object to return
   StringArray args = _argv;
   // call the recrusive parse method in Command
   _top_level_command.parse(*this, ret, args);
@@ -232,7 +286,7 @@ ArgParser::Command::add_option(std::string const &name, std::string const &key, 
 
 // add sub-command without args
 ArgParser::Command &
-ArgParser::Command::add_subcommand(std::string const &cmd_name, std::string const &cmd_description)
+ArgParser::Command::add_command(std::string const &cmd_name, std::string const &cmd_description)
 {
   check_command(cmd_name);
   ArgParser::Command command = ArgParser::Command(cmd_name, cmd_description, "", 0, nullptr);
@@ -243,8 +297,8 @@ ArgParser::Command::add_subcommand(std::string const &cmd_name, std::string cons
 
 // add sub-command with args
 ArgParser::Command &
-ArgParser::Command::add_subcommand(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar,
-                                   unsigned cmd_arg_num)
+ArgParser::Command::add_command(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar,
+                                unsigned cmd_arg_num)
 {
   check_command(cmd_name);
   ArgParser::Command command = ArgParser::Command(cmd_name, cmd_description, cmd_envvar, cmd_arg_num, nullptr);
@@ -255,8 +309,8 @@ ArgParser::Command::add_subcommand(std::string const &cmd_name, std::string cons
 
 // add sub-command without args and function
 ArgParser::Command &
-ArgParser::Command::add_subcommand(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar,
-                                   unsigned cmd_arg_num, Function const &f)
+ArgParser::Command::add_command(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar,
+                                unsigned cmd_arg_num, Function const &f)
 {
   check_command(cmd_name);
   ArgParser::Command command = ArgParser::Command(cmd_name, cmd_description, cmd_envvar, cmd_arg_num, f);
@@ -292,7 +346,7 @@ ArgParser::show_parser_info() const
 
 // helper method to handle the arguments and put them nicely in data
 static void
-handle_args(ArgParser &base, ParsedArgs &ret, StringArray &args, ParserData &data, std::string const &name, unsigned arg_num,
+handle_args(ArgParser &base, Arguments &ret, StringArray &args, ArgumentData &data, std::string const &name, unsigned arg_num,
             unsigned &index)
 {
   // handle the args
@@ -322,7 +376,7 @@ handle_args(ArgParser &base, ParsedArgs &ret, StringArray &args, ParserData &dat
 
 // append the args of option to parsed data
 static void
-append_option_data(ArgParser &base, ParsedArgs &ret, StringArray &args,
+append_option_data(ArgParser &base, Arguments &ret, StringArray &args,
                    std::unordered_map<std::string, ArgParser::Option> const &option_list,
                    std::unordered_map<std::string, std::string> const &option_map, int index)
 {
@@ -333,7 +387,7 @@ append_option_data(ArgParser &base, ParsedArgs &ret, StringArray &args,
       std::string option_name = args[i].substr(0, args[i].find_first_of('='));
       auto it                 = option_list.find(option_name);
       if (it != option_list.end() && it->second.arg_num == 1) {
-        ParserData option_data;
+        ArgumentData option_data;
         ArgParser::Option cur_option = it->second;
         option_data.arg_data.push_back(args[i].substr(args[i].find_last_of('=') + 1));
         args.erase(args.begin() + i);
@@ -352,7 +406,7 @@ append_option_data(ArgParser &base, ParsedArgs &ret, StringArray &args,
         if (args[i] == "--help" || args[i] == "-h") {
           base.help_message();
         }
-        ParserData option_data;
+        ArgumentData option_data;
         ArgParser::Option cur_option;
         if (list_it != option_list.end()) {
           cur_option = list_it->second;
@@ -367,7 +421,7 @@ append_option_data(ArgParser &base, ParsedArgs &ret, StringArray &args,
 
 // Main recursive logic of Parsing
 void
-ArgParser::Command::parse(ArgParser &base, ParsedArgs &ret, StringArray &args)
+ArgParser::Command::parse(ArgParser &base, Arguments &ret, StringArray &args)
 {
   // check for conflict commands
   bool conflict_flag = false;
@@ -384,7 +438,7 @@ ArgParser::Command::parse(ArgParser &base, ParsedArgs &ret, StringArray &args)
   for (unsigned i = 0; i < args.size(); i++) {
     if (_name == args[i]) {
       // get ENV var first
-      ParserData cmd_data;
+      ArgumentData cmd_data;
       if (_envvar.size() > 0) {
         cmd_data.env_data = getenv(_envvar.c_str()) ? getenv(_envvar.c_str()) : "";
       }
@@ -437,13 +491,13 @@ ArgParser::Command::show_command_info() const
   }
 }
 
-//=========================== ParsedArgs class ================================
+//=========================== Arguments class ================================
 
-ParsedArgs::ParsedArgs() {}
-ParsedArgs::~ParsedArgs() {}
+Arguments::Arguments() {}
+Arguments::~Arguments() {}
 
 std::string
-ParsedArgs::get_env(std::string const &name) const
+Arguments::get_env(std::string const &name) const
 {
   auto it = _data_map.find(name);
   if (it != _data_map.end()) {
@@ -453,7 +507,7 @@ ParsedArgs::get_env(std::string const &name) const
   }
 }
 StringArray
-ParsedArgs::get_args(std::string const &name) const
+Arguments::get_args(std::string const &name) const
 {
   auto it = _data_map.find(name);
   if (it != _data_map.end()) {
@@ -464,7 +518,7 @@ ParsedArgs::get_args(std::string const &name) const
 }
 
 std::string
-ParsedArgs::get_arg(std::string const &name, unsigned index) const
+Arguments::get_arg(std::string const &name, unsigned index) const
 {
   auto it = _data_map.find(name);
   if (it != _data_map.end() && !it->second.arg_data.empty()) {
@@ -478,7 +532,7 @@ ParsedArgs::get_arg(std::string const &name, unsigned index) const
 }
 
 bool
-ParsedArgs::called(std::string const &name) const
+Arguments::called(std::string const &name) const
 {
   if (_data_map.find(name) != _data_map.end()) {
     return true;
@@ -488,14 +542,14 @@ ParsedArgs::called(std::string const &name) const
 }
 
 void
-ParsedArgs::append(std::string const &key, ParserData const &value)
+Arguments::append(std::string const &key, ArgumentData const &value)
 {
   // perform overwrite for now
   _data_map[key] = value;
 }
 
 void
-ParsedArgs::show_all_configuration() const
+Arguments::show_all_configuration() const
 {
   for (auto it : _data_map) {
     std::cout << "name: " + it.first << std::endl;
@@ -511,7 +565,7 @@ ParsedArgs::show_all_configuration() const
 
 // invoke the function with the args
 int
-ParsedArgs::invoke()
+Arguments::invoke()
 {
   if (_action) {
     // call the std::function

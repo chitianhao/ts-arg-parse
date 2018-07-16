@@ -39,7 +39,7 @@ Description
 The program defines what it requires by adding commands and options.
 Then :class:`ArgParser` will figure out what is related from the command line.
 All parsed arguments and function will be put in a key value pairs structure
-:class:`ParsedArgs` available for users to use.
+:class:`Arguments` available for users to use.
 
 Usage
 +++++
@@ -74,22 +74,15 @@ To add the usage for the help message of this program:
 Add commands and options
 ------------------------
 
-All commands and options are dealt with in the top level command.
-So the `base_command()` should be called first to be dealt with.
+We can perform all kinds of operations on the parser which is itself or command which is a :class:`Command`.
+
+To add commands to the program or current command:
 
 .. code-block:: cpp
-
-   ts::ArgParser::Command &base_command = parser.base_command();
-
-Then we can perform all kinds of operations on the base command which is a :class:`Command`.
-
-To add subcommands to the current command:
-
-.. code-block:: cpp
-
-   base_command.add_subcommand("command", "description");
-   base_command.add_subcommand("command", "description", "ENV_VAR", 0);
-   base_command.add_subcommand("command", "description", "ENV_VAR", 0, &function);
+   parser.add_command("command", "description");
+   command1.add_command("command", "description");
+   command2.add_command("command", "description", "ENV_VAR", 0);
+   command3.add_command("command", "description", "ENV_VAR", 0, &function);
 
 This function call returns the new :class:`Command` instance added. (0 is number of argument)
 
@@ -98,12 +91,12 @@ This function call returns the new :class:`Command` instance added. (0 is number
    The 0 here is the number of arguments we expected. It can be also set to `INFINITE_ARG_NUM`
    to specify that this command expect all the arguments comes later (infinite).
 
-To add options to the current command:
+To add options to the parser or current command:
 
 .. code-block:: cpp
-
-    base_command.add_option("--switch", "-s", "switch description");
-    base_command.add_option("--switch", "-s", "switch description", "", 0);
+    parser.add_option("--switch", "-s", "switch description");
+    command1.add_option("--switch", "-s", "switch description");
+    command2.add_option("--switch", "-s", "switch description", "", 0);
 
 This function call returns the new :class:`Option` instance. (0 is also number of arguments)
 
@@ -111,14 +104,14 @@ We can also use the following way to add subcommand or option:
 
 .. code-block:: cpp
 
-    base_command.add_subcommand("init", "description").add_subcommand("subinit", "description");
+    command.add_command("init", "description").add_command("subinit", "description");
 
 which is equivalent to
 
 .. code-block:: cpp
 
-    ts::ArgParser::Command &init_command = base_command.add_subcommand("init", "description");
-    init_command.add_subcommand("subinit", "description");
+    ts::ArgParser::Command &init_command = command.add_command("init", "description");
+    init_command.add_command("subinit", "description");
 
 In this case, subinit is the subcommand of init.
 
@@ -126,13 +119,19 @@ Parsing Arguments
 -----------------
 
 ArgParser parses arguments through the `parse()` method. This will inspect the command line
-and walk through it. A :class:`ParsedArg` object will built up from attributes
+and walk through it. A :class:`Arguments` object will built up from attributes
 parsed out of the command line holding key-value pairs all the parsed data and the function.
 
 .. code-block:: cpp
 
-    parser.parse();
+    Arguments args = parser.parse();
 
 Invoke functions
 ----------------
-TODO
+
+To invoke the function associated, we can perform it by simply calling `invoke()` method from the
+:class:`Arguments` object returned from the parsing. The function can be lambda.
+
+.. code-block:: cpp
+
+    args.invoke();
