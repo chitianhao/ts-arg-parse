@@ -31,7 +31,8 @@
 #include <string_view>
 
 // For unspecified-number args
-static constexpr unsigned INFINITE_ARG_NUM = ~0;
+static constexpr unsigned INFINITE_ARG_NUM     = ~0;
+static constexpr unsigned AT_LEAST_ONE_ARG_NUM = ~0 - 1;
 
 namespace ts
 {
@@ -59,11 +60,11 @@ public:
   /** Get the related arguments given the name of command/option.
       @return The parsed arguments associated with certain command/option.
   */
-  StringArray get_args(std::string const &name) const;
+  StringArray get(std::string const &name) const;
   /** Get the argument at certain index given the name of command/option.
       @return The parsed argument associated with certain command/option.
   */
-  std::string get_arg(std::string const &name, unsigned index) const;
+  std::string get(std::string const &name, unsigned index) const;
   /** To check if certain command/option is called
       @return true if called, else false
   */
@@ -77,7 +78,7 @@ public:
   */
   int invoke();
   // TODO: Some other method to deal with types of the parsed args
-  // get_args_int, get_args_long, get_args_bool ...
+  // get_int, get_long, get_bool ...
 
 private:
   // A map of all the called parsed args/data
@@ -95,8 +96,8 @@ public:
   // Option structure: e.x. --arg -a
   // Contains all information about certain option(--switch)
   struct Option {
-    std::string name;        // long option: --arg
-    std::string key;         // short option: -a
+    std::string long_option;        // long option: --arg
+    std::string short_option;         // short option: -a
     std::string description; // help description
     std::string envvar;      // stored ENV variable
     unsigned arg_num = 0;    // number of argument expected
@@ -112,34 +113,31 @@ public:
             Function const &f);
     // Desctructor
     ~Command();
-
-    /** Add an option to current command without arguments
+    /** Add an option to current command
         @return The Option object.
     */
-    Option &add_option(std::string const &name, std::string const &key, std::string const &description);
-    /** Add an option to current command with arguments
-        @return The Option object.
-    */
-    Option &add_option(std::string const &name, std::string const &key, std::string const &description, std::string const &envvar,
-                       unsigned arg_num = 0);
+    Option &add_option(std::string const &long_option, std::string const &short_option, std::string const &description,
+                       std::string const &envvar = "", unsigned arg_num = 0);
 
     /** Three ways of adding a sub-command to current command:
      * 1. Without arguments.
-     * 2. With arguments.
-     * 3. With arguments and function
+     * 2. with only function
+     * 3. With arguments.
+     * 4. With arguments and function
         @return The new sub-command instance.
     */
-    Command &add_command(std::string const &cmd_name, std::string const &cmd_description);
+    Command &add_command(std::string const &cmd_name, std::string const &cmd_description, Function const &f = nullptr);
     Command &add_command(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar,
-                         unsigned cmd_arg_num);
-    Command &add_command(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar,
-                         unsigned cmd_arg_num, Function const &f);
+                         unsigned cmd_arg_num, Function const &f = nullptr);
     // add an example usage of current command for the help message
     void add_example_usage(std::string const &usage);
 
+    // require subcommand for this command
+    void require_commands();
+
   protected:
     // Helper method for add_option
-    void check_option(std::string const &name, std::string const &key) const;
+    void check_option(std::string const &long_option, std::string const &short_option) const;
     // Helper method for add_command
     void check_command(std::string const &name) const;
     // Helper method for ArgParser::show_parser_info
@@ -174,6 +172,9 @@ public:
     // Map for fast searching: <short option: long option>
     std::unordered_map<std::string, std::string> _option_map;
 
+    // require command for this parser
+    bool command_required = false;
+
   protected:
     friend class ArgParser;
   };
@@ -182,15 +183,11 @@ public:
   ArgParser(std::string_view name, std::string_view description, std::string_view envvar, unsigned arg_num, Function const &f);
   ~ArgParser();
 
-  /** Add an option to current command without arguments
-    @return The Option object.
-  */
-  Option &add_option(std::string const &name, std::string const &key, std::string const &description);
   /** Add an option to current command with arguments
       @return The Option object.
   */
-  Option &add_option(std::string const &name, std::string const &key, std::string const &description, std::string const &envvar,
-                     unsigned arg_num = 0);
+  Option &add_option(std::string const &long_option, std::string const &short_option, std::string const &description,
+                     std::string const &envvar = "", unsigned arg_num = 0);
 
   /** Three ways of adding command to the parser:
    * 1. Without arguments.
@@ -198,11 +195,9 @@ public:
    * 3. With arguments and function
       @return The new command instance.
   */
-  Command &add_command(std::string const &cmd_name, std::string const &cmd_description);
+  Command &add_command(std::string const &cmd_name, std::string const &cmd_description, Function const &f = nullptr);
   Command &add_command(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar,
-                       unsigned cmd_arg_num);
-  Command &add_command(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar,
-                       unsigned cmd_arg_num, Function const &f);
+                       unsigned cmd_arg_num, Function const &f = nullptr);
 
   /** Main parsing function
       @return The Arguments object available for program using
@@ -216,6 +211,9 @@ public:
   // Add the usage to global_usage for help_message()
   // Example: traffic_blabla [--SWITCH [ARG]]
   void add_global_usage(std::string const &usage);
+
+  // require subcommand for this parser
+  void require_commands();
 
 protected:
   // Converted from 'const char **argv' for the use of parsing and help

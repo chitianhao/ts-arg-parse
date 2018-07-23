@@ -56,11 +56,11 @@ TEST_CASE("Parsing test", "[parse]")
   REQUIRE(parsed_data.called("--initoption") == true);
   REQUIRE(parsed_data.called("a") == false);
   REQUIRE(parsed_data.get_env("init").size() != 0);
-  REQUIRE(parsed_data.get_args("init").size() == 1);
-  REQUIRE(parsed_data.get_args("init")[0] == "a");
-  REQUIRE(parsed_data.get_args("--globalx").size() == 2);
-  REQUIRE(parsed_data.get_args("--globalx")[0] == "x");
-  REQUIRE(parsed_data.get_args("--globalx")[1] == "y");
+  REQUIRE(parsed_data.get("init").size() == 1);
+  REQUIRE(parsed_data.get("init")[0] == "a");
+  REQUIRE(parsed_data.get("--globalx").size() == 2);
+  REQUIRE(parsed_data.get("--globalx")[0] == "x");
+  REQUIRE(parsed_data.get("--globalx")[1] == "y");
 
   const char *argv2[] = {"traffic_blabla", "init", "subinit", "a", "b", "--initoption2=abc", "--subinitopt", "-y", NULL};
 
@@ -68,9 +68,9 @@ TEST_CASE("Parsing test", "[parse]")
   REQUIRE(parsed_data.called("init") == true);
   REQUIRE(parsed_data.called("--subinitopt") == true);
   REQUIRE(parsed_data.called("--globaly") == true);
-  REQUIRE(parsed_data.get_args("subinit").size() == 2);
-  REQUIRE(parsed_data.get_args("--initoption2").size() == 1);
-  REQUIRE(parsed_data.get_args("--initoption2")[0] == "abc");
+  REQUIRE(parsed_data.get("subinit").size() == 2);
+  REQUIRE(parsed_data.get("--initoption2").size() == 1);
+  REQUIRE(parsed_data.get("--initoption2")[0] == "abc");
 
   const char *argv3[] = {"traffic_blabla", "-x", "abc", "xyz", "remove", "subremove", "subsubremove", NULL};
 
@@ -78,7 +78,7 @@ TEST_CASE("Parsing test", "[parse]")
   REQUIRE(parsed_data.called("remove") == true);
   REQUIRE(parsed_data.called("subremove") == true);
   REQUIRE(parsed_data.called("subsubremove") == true);
-  REQUIRE(parsed_data.get_args("--globalx").size() == 2);
+  REQUIRE(parsed_data.get("--globalx").size() == 2);
 }
 
 int

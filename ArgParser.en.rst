@@ -164,15 +164,15 @@ Classes
 
       Return the ENV variable given the name of command or option.
 
-   .. function:: std::vector<std::string> get_args(std::string const &name)
+   .. function:: std::vector<std::string> get(std::string const &name)
 
       Return the arguments string array given the name of command or option.
 
-   .. function:: std::string get_args(std::string const &name, unsigned index)
+   .. function:: std::string get(std::string const &name, unsigned index)
 
       Return the argument string at the certain index given the name of command or option.
       This can be an easy use to get the arg of command or option that only expect one argument by
-      simply calling, for example, :code:`std::string path = get_args("--path", 0);`.
+      simply calling, for example, :code:`std::string path = get("--path", 0);`.
 
    .. function:: bool called(std::string const &name)
 
@@ -199,6 +199,10 @@ Classes
    .. function:: Command &add_command(std::string const &cmd_name, std::string const &cmd_description)
 
       Add a command with only *name* and *description*. Return the new Command object.
+
+   .. function:: Command &add_command(std::string const &cmd_name, std::string const &cmd_description, Function const &f)
+
+      Add a command with only *name* and *description* and *function to invoke*. Return the new Command object.
 
    .. function:: Command &add_command(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar, unsigned cmd_arg_num)
 
@@ -230,6 +234,10 @@ Classes
 
       Add a global_usage for :code:`help_message()`. Example: `traffic_blabla [--SWITCH [ARG]]`.
 
+   .. function:: void require_commands();
+
+      Make the parser require commands. If no command is fonud, output help message.
+
 .. class:: Option
 
    :class:`Option` is a data struct containing information about an option.
@@ -249,7 +257,7 @@ Classes
    :class:`Command` is a nested structure of command for :class:`ArgParser`. The :code:`add_option()` and :code:`add_command()`
    are the same with those in :class:`ArgParser`. When :code:`add_command()` is called under certain command, it will be
    added as a subcommand for the current command. For Example, :code:`command1.add_command("command2", "description")`
-   will make :code:`command2` a subcommand of :code:`command1`.
+   will make :code:`command2` a subcommand of :code:`command1`. :code:`require_commands()` is also available within :class:`Command`.
 
    .. function:: void add_example_usage(std::string const &usage)
 
@@ -289,8 +297,8 @@ This program will have such functionality:
         parser.add_global_usage("traffic_blabla [some stuff]");
 
         parser.add_option("--switch", "-s", "top level switch");
-        parser.add_command("func", "some function", "", 2, &function);
-        parser.add_command("func2", "some function2", "", 0, [&]() { return function2(100); });
+        parser.add_command("func", "some function", "ENV_VAR", 2, &function);
+        parser.add_command("func2", "some function2", [&]() { return function2(100); });
 
         ts::ArgParser::Command &init_command = parser.add_command("init", "initialize");
         init_command.add_option("--path", "-p", "specify the path", "", 1);
