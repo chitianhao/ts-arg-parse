@@ -33,7 +33,7 @@ TEST_CASE("Parsing test", "[parse]")
   ts::ArgParser parser;
   parser.add_global_usage("traffic_blabla [--SWITCH]");
 
-  parser.add_option("--globalx", "-x", "global switch x", "", 2);
+  parser.add_option("--globalx", "-x", "global switch x", "HOME", 2);
   parser.add_option("--globaly", "-y", "global switch y");
 
   ts::ArgParser::Command &init_command   = parser.add_command("init", "initialize traffic blabla", "HOME", 1, nullptr);
@@ -53,6 +53,7 @@ TEST_CASE("Parsing test", "[parse]")
   parsed_data = parser.parse(argv1);
   REQUIRE(parsed_data.called("init") == true);
   REQUIRE(parsed_data.called("--globalx") == true);
+  REQUIRE(parsed_data.get_env("--globalx").size() != 0);
   REQUIRE(parsed_data.called("--initoption") == true);
   REQUIRE(parsed_data.called("a") == false);
   REQUIRE(parsed_data.get_env("init").size() != 0);
@@ -62,7 +63,7 @@ TEST_CASE("Parsing test", "[parse]")
   REQUIRE(parsed_data.get("--globalx")[0] == "x");
   REQUIRE(parsed_data.get("--globalx")[1] == "y");
 
-  const char *argv2[] = {"traffic_blabla", "init", "subinit", "a", "b", "--initoption2=abc", "--subinitopt", "-y", NULL};
+  const char *argv2[] = {"traffic_blabla", "init", "i", "subinit", "a", "b", "--initoption2=abc", "--subinitopt", "-y", NULL};
 
   parsed_data = parser.parse(argv2);
   REQUIRE(parsed_data.called("init") == true);

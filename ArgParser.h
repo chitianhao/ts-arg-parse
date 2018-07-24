@@ -71,6 +71,10 @@ public:
   bool called(std::string const &name) const;
   // Append key value pairs to the datamap
   void append(std::string const &key, ArgumentData const &value);
+  // Append value to the arg of key
+  void append_arg(std::string const &key, std::string const &value);
+  // append env to the key
+  void append_env(std::string const &key, std::string const &value);
   // Print all we have in the parsed data to the console
   void show_all_configuration() const;
   /** Invoke the function associated with the parsed command.
@@ -96,11 +100,12 @@ public:
   // Option structure: e.x. --arg -a
   // Contains all information about certain option(--switch)
   struct Option {
-    std::string long_option;        // long option: --arg
-    std::string short_option;         // short option: -a
-    std::string description; // help description
-    std::string envvar;      // stored ENV variable
-    unsigned arg_num = 0;    // number of argument expected
+    std::string long_option;   // long option: --arg
+    std::string short_option;  // short option: -a
+    std::string description;   // help description
+    std::string envvar;        // stored ENV variable
+    unsigned arg_num;          // number of argument expected
+    std::string default_value; // default value of option
   };
 
   // Class for commands in a nested way
@@ -117,7 +122,7 @@ public:
         @return The Option object.
     */
     Option &add_option(std::string const &long_option, std::string const &short_option, std::string const &description,
-                       std::string const &envvar = "", unsigned arg_num = 0);
+                       std::string const &envvar = "", unsigned arg_num = 0, std::string const &default_value = "");
 
     /** Three ways of adding a sub-command to current command:
      * 1. Without arguments.
@@ -130,10 +135,11 @@ public:
     Command &add_command(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar,
                          unsigned cmd_arg_num, Function const &f = nullptr);
     // add an example usage of current command for the help message
-    void add_example_usage(std::string const &usage);
+    Command &add_example_usage(std::string const &usage);
 
-    // require subcommand for this command
-    void require_commands();
+    // require subcommand/options for this command
+    Command &require_commands();
+    Command &require_options();
 
   protected:
     // Helper method for add_option
@@ -145,7 +151,7 @@ public:
     // Helper method for ArgParser::help_message
     void output_command(std::ostream &out, std::string const &prefix) const;
     // Helper method for ArgParser::parse
-    void parse(ArgParser &base, Arguments &ret, StringArray &args);
+    bool parse(ArgParser &base, Arguments &ret, StringArray &args);
 
     // The parent of current command
     Command *_parent = nullptr;
@@ -172,10 +178,10 @@ public:
     // Map for fast searching: <short option: long option>
     std::unordered_map<std::string, std::string> _option_map;
 
-    // require command for this parser
-    bool command_required = false;
+    // require command / option for this parser
+    bool _command_required = false;
+    bool _option_required  = false;
 
-  protected:
     friend class ArgParser;
   };
   // Base class constructor and destructor
@@ -187,7 +193,7 @@ public:
       @return The Option object.
   */
   Option &add_option(std::string const &long_option, std::string const &short_option, std::string const &description,
-                     std::string const &envvar = "", unsigned arg_num = 0);
+                     std::string const &envvar = "", unsigned arg_num = 0, std::string const &default_value = "");
 
   /** Three ways of adding command to the parser:
    * 1. Without arguments.
@@ -213,7 +219,8 @@ public:
   void add_global_usage(std::string const &usage);
 
   // require subcommand for this parser
-  void require_commands();
+  Command &require_commands();
+  Command &require_options();
 
 protected:
   // Converted from 'const char **argv' for the use of parsing and help

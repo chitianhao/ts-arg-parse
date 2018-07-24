@@ -25,6 +25,7 @@
 // #include "ink_file.h"
 // #include "I_Version.h"
 
+#include <sstream>
 #include <iostream>
 
 namespace ts
@@ -43,9 +44,9 @@ ArgParser::~ArgParser() {}
 // add new options with args
 ArgParser::Option &
 ArgParser::add_option(std::string const &long_option, std::string const &short_option, std::string const &description,
-                      std::string const &envvar, unsigned arg_num)
+                      std::string const &envvar, unsigned arg_num, std::string const &default_value)
 {
-  return _top_level_command.add_option(long_option, short_option, description, envvar, arg_num);
+  return _top_level_command.add_option(long_option, short_option, description, envvar, arg_num, default_value);
 }
 
 // add sub-command with only function
@@ -189,10 +190,16 @@ ArgParser::parse(const char **argv)
   return ret;
 }
 
-void
+ArgParser::Command &
 ArgParser::require_commands()
 {
-  _top_level_command.command_required = true;
+  return _top_level_command.require_commands();
+}
+
+ArgParser::Command &
+ArgParser::require_options()
+{
+  return _top_level_command.require_options();
 }
 
 //=========================== Command class ================================
@@ -262,10 +269,10 @@ ArgParser::Command::check_command(std::string const &name) const
 // add new options with args
 ArgParser::Option &
 ArgParser::Command::add_option(std::string const &long_option, std::string const &short_option, std::string const &description,
-                               std::string const &envvar, unsigned arg_num)
+                               std::string const &envvar, unsigned arg_num, std::string const &default_value)
 {
   check_option(long_option, short_option);
-  _option_list[long_option] = {long_option, short_option == "-" ? "" : short_option, description, envvar, arg_num};
+  _option_list[long_option] = {long_option, short_option == "-" ? "" : short_option, description, envvar, arg_num, default_value};
   if (short_option != "-" && !short_option.empty()) {
     _option_map[short_option] = long_option;
   }
@@ -295,10 +302,11 @@ ArgParser::Command::add_command(std::string const &cmd_name, std::string const &
   return _subcommand_list[cmd_name];
 }
 
-void
+ArgParser::Command &
 ArgParser::Command::add_example_usage(std::string const &usage)
 {
   _example_usage = usage;
+  return *this;
 }
 
 // method used by help_message()
@@ -368,21 +376,31 @@ append_option_data(ArgParser &base, Arguments &ret, StringArray &args,
                    std::unordered_map<std::string, ArgParser::Option> const &option_list,
                    std::unordered_map<std::string, std::string> const &option_map, int index)
 {
+  std::unordered_map<std::string, int> check_map;
   for (unsigned i = index; i < args.size(); i++) {
     // find matches of the arg
     if (args[i][0] == '-' && args[i][1] == '-' && args[i].find('=') != std::string::npos) {
       // deal with --args=
       std::string option_name = args[i].substr(0, args[i].find_first_of('='));
-      auto it                 = option_list.find(option_name);
-      if (it != option_list.end() && it->second.arg_num == 1) {
-        ArgumentData option_data;
+      std::string value       = args[i].substr(args[i].find_last_of('=') + 1);
+      if (value.empty()) {
+        std::cout << "missing argument for '" << option_name << "'" << std::endl;
+        base.help_message();
+      }
+      auto it = option_list.find(option_name);
+      if (it != option_list.end()) {
         ArgParser::Option cur_option = it->second;
-        option_data.arg_data.push_back(args[i].substr(args[i].find_last_of('=') + 1));
+        // handle environment variable
+        if (!cur_option.envvar.empty()) {
+          ret.append_env(cur_option.long_option, getenv(cur_option.envvar.c_str()) ? getenv(cur_option.envvar.c_str()) : "");
+        }
+        ret.append_arg(cur_option.long_option, value);
+        check_map[cur_option.long_option] += 1;
         args.erase(args.begin() + i);
-        ret.append(cur_option.long_option, option_data);
         i -= 1;
       }
     } else {
+      // deal with normal --arg val1 val2 ...
       auto list_it = option_list.find(args[i]);
       auto map_it  = option_map.find(args[i]);
       if (list_it != option_list.end() || map_it != option_map.end()) {
@@ -401,38 +419,45 @@ append_option_data(ArgParser &base, Arguments &ret, StringArray &args,
         } else {
           cur_option = option_list.at(map_it->second);
         }
+        // handle environment variable
+        if (!cur_option.envvar.empty()) {
+          option_data.env_data = getenv(cur_option.envvar.c_str()) ? getenv(cur_option.envvar.c_str()) : "";
+        }
+        // handle the arguments
         handle_args(base, ret, args, option_data, cur_option.long_option, cur_option.arg_num, i);
+      }
+    }
+  }
+  // check for wrong number of arguments for --arg=...
+  for (auto it : check_map) {
+    if (option_list.at(it.first).arg_num != it.second) {
+      std::cout << "Error: " << option_list.at(it.first).arg_num << " arguments expected by " << it.first << std::endl;
+      base.help_message();
+    }
+  }
+  // put in the default value of options
+  for (auto it : option_list) {
+    if (!it.second.default_value.empty() && ret.get(it.first).empty()) {
+      std::istringstream ss(it.second.default_value);
+      std::string token;
+      while (std::getline(ss, token, ' ')) {
+        ret.append_arg(it.first, token);
       }
     }
   }
 }
 
 // Main recursive logic of Parsing
-void
+bool
 ArgParser::Command::parse(ArgParser &base, Arguments &ret, StringArray &args)
 {
-  // check for conflict commands
-  bool command_flag = false;
-  for (auto it : args) {
-    if (_subcommand_list.find(it) != _subcommand_list.end()) {
-      if (command_flag == true) {
-        std::cout << "Error: Multiple commands found" << std::endl;
-        base.help_message();
-      }
-      command_flag = true;
-    }
-  }
-  if (!command_flag && command_required) {
-    std::cout << "Error: No command found" << std::endl;
-    base.help_message();
-  }
-
+  bool command_called = false;
   // iterate through all arguments
   for (unsigned i = 0; i < args.size(); i++) {
     if (_name == args[i]) {
       // get ENV var first
       ArgumentData cmd_data;
-      if (_envvar.size() > 0) {
+      if (!_envvar.empty()) {
         cmd_data.env_data = getenv(_envvar.c_str()) ? getenv(_envvar.c_str()) : "";
       }
       // handle the option
@@ -441,20 +466,22 @@ ArgParser::Command::parse(ArgParser &base, Arguments &ret, StringArray &args)
       if (_f) {
         ret._action = _f;
       }
-      // when subcommand is called, continue
-      if (_subcommand_list.find(args[i + 1]) != _subcommand_list.end()) {
-        args.erase(args.begin() + i);
-        ret.append(_name, cmd_data);
-        break;
-      }
       handle_args(base, ret, args, cmd_data, _name, _arg_num, i);
-      return;
+      command_called = true;
+      break;
     }
+  }
+  if (!command_called && _command_required) {
+    std::cout << "Error: No command found" << std::endl;
+    base.help_message();
   }
   // recursively call subcommand
   for (auto it : _subcommand_list) {
-    it.second.parse(base, ret, args);
+    if (it.second.parse(base, ret, args)) {
+      break;
+    }
   }
+  return command_called;
 }
 
 void
@@ -483,10 +510,19 @@ ArgParser::Command::show_command_info() const
     it.second.show_command_info();
   }
 }
-void
+
+ArgParser::Command &
 ArgParser::Command::require_commands()
 {
-  command_required = true;
+  _command_required = true;
+  return *this;
+}
+
+ArgParser::Command &
+ArgParser::Command::require_options()
+{
+  _option_required = true;
+  return *this;
 }
 
 //=========================== Arguments class ================================
@@ -540,6 +576,19 @@ Arguments::append(std::string const &key, ArgumentData const &value)
 {
   // perform overwrite for now
   _data_map[key] = value;
+}
+
+void
+Arguments::append_arg(std::string const &key, std::string const &value)
+{
+  _data_map[key].arg_data.push_back(value);
+}
+
+void
+Arguments::append_env(std::string const &key, std::string const &value)
+{
+  // perform overwrite for now
+  _data_map[key].env_data = value;
 }
 
 void
