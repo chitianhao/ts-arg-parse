@@ -30,9 +30,13 @@
 #include <functional>
 #include <string_view>
 
-// For unspecified-number args
-static constexpr unsigned INFINITE_ARG_NUM     = ~0;
-static constexpr unsigned AT_LEAST_ONE_ARG_NUM = ~0 - 1;
+// more than zero arguments
+static constexpr unsigned INFINITE_ARG_N = ~0;
+// more than one arguments
+static constexpr unsigned MORE_THAN_ONE_ARG_N = ~0 - 1;
+// some indent magic numbers
+static constexpr int INDENT_ONE = 25;
+static constexpr int INDENT_TWO = 74;
 
 namespace ts
 {
@@ -42,8 +46,15 @@ using Function    = std::function<int()>;
 
 /// Struct holding both the ENV and String arguments
 struct ArgumentData {
+  operator bool() const { return is_called; };
+  std::string env();
+  StringArray args();
+  std::string at(unsigned index);
+  //value(), size(), emtpty()
+
   std::string env_data;
   StringArray arg_data;
+  bool is_called = false;
 };
 
 // The class holding all the parsed data after ArgParser::parse()
@@ -53,27 +64,12 @@ public:
   Arguments();
   ~Arguments();
 
-  /** Get the related env variable given the name of command/option.
-      @return The ENV variable associated with certain command/option.
-  */
-  std::string get_env(std::string const &name) const;
-  /** Get the related arguments given the name of command/option.
-      @return The parsed arguments associated with certain command/option.
-  */
-  StringArray get(std::string const &name) const;
-  /** Get the argument at certain index given the name of command/option.
-      @return The parsed argument associated with certain command/option.
-  */
-  std::string get(std::string const &name, unsigned index) const;
-  /** To check if certain command/option is called
-      @return true if called, else false
-  */
-  bool called(std::string const &name) const;
+  ArgumentData get(std::string const &name);
   // Append key value pairs to the datamap
   void append(std::string const &key, ArgumentData const &value);
-  // Append value to the arg of key
+  // Append value to the arg to the map of key
   void append_arg(std::string const &key, std::string const &value);
-  // append env to the key
+  // append env value to the map with key
   void append_env(std::string const &key, std::string const &value);
   // Print all we have in the parsed data to the console
   void show_all_configuration() const;
@@ -81,8 +77,6 @@ public:
       @return The return value of the executed command (int).
   */
   int invoke();
-  // TODO: Some other method to deal with types of the parsed args
-  // get_int, get_long, get_bool ...
 
 private:
   // A map of all the called parsed args/data
@@ -90,10 +84,11 @@ private:
   std::unordered_map<std::string, ArgumentData> _data_map;
   // The function associated. invoke() will call this func
   Function _action;
+
   friend class ArgParser;
 };
 
-// Basic container class of the parser
+// Class of the ArgParser
 class ArgParser
 {
 public:
@@ -106,46 +101,48 @@ public:
     std::string envvar;        // stored ENV variable
     unsigned arg_num;          // number of argument expected
     std::string default_value; // default value of option
+    std::string key;           // look-up key
   };
 
   // Class for commands in a nested way
   class Command
   {
   public:
-    // Constructor
+    // Constructor and destructor
     Command();
-    Command(std::string const &name, std::string const &description, std::string const &envvar, unsigned arg_num,
-            Function const &f);
-    // Desctructor
     ~Command();
     /** Add an option to current command
         @return The Option object.
     */
     Option &add_option(std::string const &long_option, std::string const &short_option, std::string const &description,
-                       std::string const &envvar = "", unsigned arg_num = 0, std::string const &default_value = "");
+                       std::string const &envvar = "", unsigned arg_num = 0, std::string const &default_value = "",
+                       std::string const &key = "");
 
-    /** Three ways of adding a sub-command to current command:
-     * 1. Without arguments.
-     * 2. with only function
-     * 3. With arguments.
-     * 4. With arguments and function
+    /** Two ways of adding a sub-command to current command:
         @return The new sub-command instance.
     */
-    Command &add_command(std::string const &cmd_name, std::string const &cmd_description, Function const &f = nullptr);
+    Command &add_command(std::string const &cmd_name, std::string const &cmd_description, Function const &f = nullptr,
+                         std::string const &key = "");
     Command &add_command(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar,
-                         unsigned cmd_arg_num, Function const &f = nullptr);
-    // add an example usage of current command for the help message
+                         unsigned cmd_arg_num, Function const &f = nullptr, std::string const &key = "");
+    /** Add an example usage of current command for the help message
+        @return The Command instance for chained calls.
+    */
     Command &add_example_usage(std::string const &usage);
-
-    // require subcommand/options for this command
+    /** Require subcommand/options for this command
+        @return The Command instance for chained calls.
+    */
     Command &require_commands();
     Command &require_options();
 
   protected:
-    // Helper method for add_option
-    void check_option(std::string const &long_option, std::string const &short_option) const;
-    // Helper method for add_command
-    void check_command(std::string const &name) const;
+    // Main constructor called by add_command()
+    Command(std::string const &name, std::string const &description, std::string const &envvar, unsigned arg_num, Function const &f,
+            std::string const &key = "");
+    // Helper method for add_option to check the validity of option
+    void check_option(std::string const &long_option, std::string const &short_option, std::string const &key) const;
+    // Helper method for add_command to check the validity of command
+    void check_command(std::string const &name, std::string const &key) const;
     // Helper method for ArgParser::show_parser_info
     void show_command_info() const;
     // Helper method for ArgParser::help_message
@@ -160,13 +157,15 @@ public:
     std::string _description;
 
     // Expected argument number
-    unsigned _arg_num = 0;
+    unsigned _arg_num;
     // Stored Env variable
     std::string _envvar;
     // An example usage can be added for the help message
     std::string _example_usage;
     // Function associated with this command
     Function _f;
+    // look up key
+    std::string _key;
 
     // list of all subcommands of current command
     // Key: command name. Value: Command object
@@ -174,7 +173,6 @@ public:
     // list of all options of current command
     // Key: option name. Value: Option object
     std::unordered_map<std::string, Option> _option_list;
-
     // Map for fast searching: <short option: long option>
     std::unordered_map<std::string, std::string> _option_map;
 
@@ -184,7 +182,7 @@ public:
 
     friend class ArgParser;
   };
-  // Base class constructor and destructor
+  // Base class constructors and destructor
   ArgParser();
   ArgParser(std::string_view name, std::string_view description, std::string_view envvar, unsigned arg_num, Function const &f);
   ~ArgParser();
@@ -193,17 +191,16 @@ public:
       @return The Option object.
   */
   Option &add_option(std::string const &long_option, std::string const &short_option, std::string const &description,
-                     std::string const &envvar = "", unsigned arg_num = 0, std::string const &default_value = "");
+                     std::string const &envvar = "", unsigned arg_num = 0, std::string const &default_value = "",
+                     std::string const &key = "");
 
-  /** Three ways of adding command to the parser:
-   * 1. Without arguments.
-   * 2. With arguments.
-   * 3. With arguments and function
+  /** Two ways of adding command to the parser:
       @return The new command instance.
   */
-  Command &add_command(std::string const &cmd_name, std::string const &cmd_description, Function const &f = nullptr);
+  Command &add_command(std::string const &cmd_name, std::string const &cmd_description, Function const &f = nullptr,
+                       std::string const &key = "");
   Command &add_command(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar,
-                       unsigned cmd_arg_num, Function const &f = nullptr);
+                       unsigned cmd_arg_num, Function const &f = nullptr, std::string const &key = "");
 
   /** Main parsing function
       @return The Arguments object available for program using
@@ -214,11 +211,12 @@ public:
   // The help & version messages
   void help_message() const;
   void version_message() const;
-  // Add the usage to global_usage for help_message()
-  // Example: traffic_blabla [--SWITCH [ARG]]
+  // Add the usage to global_usage for help_message(). Something like: traffic_blabla [--SWITCH [ARG]]
   void add_global_usage(std::string const &usage);
 
-  // require subcommand for this parser
+  /** Require subcommand/options for this command
+      @return The Command instance for chained calls.
+  */
   Command &require_commands();
   Command &require_options();
 

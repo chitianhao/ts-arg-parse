@@ -89,7 +89,7 @@ This function call returns the new :class:`Command` instance added.
 
 .. Note::
 
-   The 0 here is the number of arguments we expected. It can be also set to `INFINITE_ARG_NUM`
+   The 0 here is the number of arguments we expected. It can be also set to `INFINITE_ARG_N`
    to specify that this command expect all the arguments comes later (infinite).
 
 To add options to the parser or current command:

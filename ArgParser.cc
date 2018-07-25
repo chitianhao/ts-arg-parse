@@ -25,8 +25,11 @@
 // #include "ink_file.h"
 // #include "I_Version.h"
 
-#include <sstream>
 #include <iostream>
+#include <set>
+#include <sstream>
+
+std::set<std::string> key_set;
 
 namespace ts
 {
@@ -44,30 +47,38 @@ ArgParser::~ArgParser() {}
 // add new options with args
 ArgParser::Option &
 ArgParser::add_option(std::string const &long_option, std::string const &short_option, std::string const &description,
-                      std::string const &envvar, unsigned arg_num, std::string const &default_value)
+                      std::string const &envvar, unsigned arg_num, std::string const &default_value, std::string const &key)
 {
-  return _top_level_command.add_option(long_option, short_option, description, envvar, arg_num, default_value);
+  return _top_level_command.add_option(long_option, short_option, description, envvar, arg_num, default_value, key);
 }
 
 // add sub-command with only function
 ArgParser::Command &
-ArgParser::add_command(std::string const &cmd_name, std::string const &cmd_description, Function const &f)
+ArgParser::add_command(std::string const &cmd_name, std::string const &cmd_description, Function const &f, std::string const &key)
 {
-  return _top_level_command.add_command(cmd_name, cmd_description, f);
+  return _top_level_command.add_command(cmd_name, cmd_description, f, key);
 }
 
 // add sub-command without args and function
 ArgParser::Command &
 ArgParser::add_command(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar,
-                       unsigned cmd_arg_num, Function const &f)
+                       unsigned cmd_arg_num, Function const &f, std::string const &key)
 {
-  return _top_level_command.add_command(cmd_name, cmd_description, cmd_envvar, cmd_arg_num, f);
+  return _top_level_command.add_command(cmd_name, cmd_description, cmd_envvar, cmd_arg_num, f, key);
 }
 
 void
 ArgParser::add_global_usage(std::string const &usage)
 {
   _global_usage = usage;
+}
+
+// the length error for help message
+static void
+length_error(std::string const &name)
+{
+  std::cerr << "Error: length error of help message from  '" << name << "'" << std::endl;
+  exit(1);
 }
 
 // handle the output of arguments for help message
@@ -77,20 +88,12 @@ argument_number_output(unsigned num)
   std::string arg_num_msg;
   if (num == 0) {
     arg_num_msg = "";
-  } else if (num == INFINITE_ARG_NUM || num == AT_LEAST_ONE_ARG_NUM) {
+  } else if (num == INFINITE_ARG_N || num == MORE_THAN_ONE_ARG_N) {
     arg_num_msg = "unlimited";
   } else {
     arg_num_msg = std::to_string(num);
   }
   return arg_num_msg;
-}
-
-// the length error for help message
-static void
-length_error(std::string const &name)
-{
-  std::cerr << "Error: length error of help message from  '" << name << "'";
-  exit(1);
 }
 
 // a graceful way to output help message
@@ -125,15 +128,15 @@ ArgParser::help_message() const
       if (!it.second.short_option.empty()) {
         msg = msg + ", " + it.second.short_option;
       }
-      if (25 - static_cast<int>(msg.size()) < 0) {
+      if (INDENT_ONE - static_cast<int>(msg.size()) < 0) {
         length_error(it.second.long_option);
       }
-      msg = msg + ": " + std::string(25 - msg.size(), ' ') + it.second.description;
-      if (74 - static_cast<int>(msg.size()) < 0) {
+      msg = msg + ": " + std::string(INDENT_ONE - msg.size(), ' ') + it.second.description;
+      if (INDENT_TWO - static_cast<int>(msg.size()) < 0) {
         length_error(it.second.long_option);
       }
       // nice formated way for output
-      std::cout << msg << std::string(74 - msg.size(), ' ') << argument_number_output(it.second.arg_num) << std::endl;
+      std::cout << msg << std::string(INDENT_TWO - msg.size(), ' ') << argument_number_output(it.second.arg_num) << std::endl;
     }
   }
   // 4. output example usage
@@ -161,6 +164,7 @@ ArgParser::parse(const char **argv)
 {
   // deal with argv first
   int size = 0;
+  key_set.clear();
   _argv.clear();
   while (argv[size]) {
     _argv.push_back(argv[size]);
@@ -173,7 +177,7 @@ ArgParser::parse(const char **argv)
   // the name of the program only
   _argv[0]                 = _argv[0].substr(_argv[0].find_last_of('/') + 1);
   _top_level_command._name = _argv[0];
-
+  _top_level_command._key  = _argv[0];
   Arguments ret; // the parsed arg object to return
   StringArray args = _argv;
   // call the recrusive parse method in Command
@@ -208,71 +212,82 @@ ArgParser::Command::Command() {}
 ArgParser::Command::~Command() {}
 
 ArgParser::Command::Command(std::string const &name, std::string const &description, std::string const &envvar, unsigned arg_num,
-                            Function const &f)
-  : _name(name), _description(description), _arg_num(arg_num), _envvar(envvar), _f(f)
+                            Function const &f, std::string const &key)
+  : _name(name), _description(description), _arg_num(arg_num), _envvar(envvar), _f(f), _key(key)
 {
 }
 
 // check if this is a valid option before adding
 void
-ArgParser::Command::check_option(std::string const &long_option, std::string const &short_option) const
+ArgParser::Command::check_option(std::string const &long_option, std::string const &short_option, std::string const &key) const
 {
   if (long_option.size() < 3 || long_option[0] != '-' || long_option[1] != '-') {
     // invalid name
-    std::cerr << "Error: invalid long option added: '" + long_option + "'";
+    std::cerr << "Error: invalid long option added: '" + long_option + "'" << std::endl;
     exit(1);
   }
-  if (short_option.size() > 0 && short_option[0] != '-') {
+  if (short_option.size() != 2 && short_option[0] != '-') {
     // invalid short option
-    std::cerr << "Error: invalid short option added: '" + short_option + "'";
+    std::cerr << "Error: invalid short option added: '" + short_option + "'" << std::endl;
     exit(1);
   }
   // find if existing in option list
-  auto list_it = _option_list.find(long_option);
-  auto map_it  = _option_map.find(short_option);
-  if (list_it != _option_list.end() || map_it != _option_map.end()) {
+  auto long_it  = _option_list.find(long_option);
+  auto short_it = _option_map.find(short_option);
+  if (long_it != _option_list.end() || short_it != _option_map.end()) {
     std::string msg;
-    if (list_it != _option_list.end()) {
+    if (long_it != _option_list.end()) {
       msg = "Error: long option '" + long_option;
     } else {
       msg = "Error: short option '" + short_option;
     }
     if (_parent) {
-      std::cerr << msg + "' already exists under command: " + _name;
+      std::cerr << msg + "' already exists under command: " + _name << std::endl;
     } else {
-      std::cerr << msg + "' already exists in current program";
+      std::cerr << msg + "' already exists in current program" << std::endl;
     }
     exit(1);
   }
-  // search recursively up
-  if (_parent) {
-    _parent->check_option(long_option, short_option);
+  // find if the key already exists
+  if (key_set.find(key) != key_set.end()) {
+    std::cerr << "Error: key for option '" << long_option << "' already exists: '" + key + "'" << std::endl;
+    exit(1);
   }
+  key_set.insert(key);
 }
 
 // check if this is a valid command before adding
 void
-ArgParser::Command::check_command(std::string const &name) const
+ArgParser::Command::check_command(std::string const &name, std::string const &key) const
 {
   if (name.empty()) {
     // invalid name
-    std::cerr << "Error: empty command cannot be added";
+    std::cerr << "Error: empty command cannot be added" << std::endl;
     exit(1);
   }
   // find if existing in subcommand list
   if (_subcommand_list.find(name) != _subcommand_list.end()) {
-    std::cerr << "Error: command already exists: '" + name + "'";
+    std::cerr << "Error: command already exists: '" + name + "'" << std::endl;
     exit(1);
   }
+  // find if the key already exists
+  if (key_set.find(key) != key_set.end()) {
+    std::cerr << "Error: key for command '" << name << "' already exists: '" + key + "'" << std::endl;
+    exit(1);
+  }
+  key_set.insert(key);
 }
 
 // add new options with args
 ArgParser::Option &
 ArgParser::Command::add_option(std::string const &long_option, std::string const &short_option, std::string const &description,
-                               std::string const &envvar, unsigned arg_num, std::string const &default_value)
+                               std::string const &envvar, unsigned arg_num, std::string const &default_value,
+                               std::string const &key)
 {
-  check_option(long_option, short_option);
-  _option_list[long_option] = {long_option, short_option == "-" ? "" : short_option, description, envvar, arg_num, default_value};
+  std::string lookup_key = key.empty() ? long_option.substr(2) : key;
+  check_option(long_option, short_option, lookup_key);
+  _option_list[long_option] = {long_option, short_option == "-" ? "" : short_option, description, envvar, arg_num, default_value,
+                               lookup_key};
   if (short_option != "-" && !short_option.empty()) {
     _option_map[short_option] = long_option;
   }
@@ -281,10 +296,12 @@ ArgParser::Command::add_option(std::string const &long_option, std::string const
 
 // add sub-command with only function
 ArgParser::Command &
-ArgParser::Command::add_command(std::string const &cmd_name, std::string const &cmd_description, Function const &f)
+ArgParser::Command::add_command(std::string const &cmd_name, std::string const &cmd_description, Function const &f,
+                                std::string const &key)
 {
-  check_command(cmd_name);
-  ArgParser::Command command = ArgParser::Command(cmd_name, cmd_description, "", 0, f);
+  std::string lookup_key = key.empty() ? cmd_name : key;
+  check_command(cmd_name, lookup_key);
+  ArgParser::Command command = ArgParser::Command(cmd_name, cmd_description, "", 0, f, lookup_key);
   command._parent            = this;
   _subcommand_list[cmd_name] = command;
   return _subcommand_list[cmd_name];
@@ -293,10 +310,11 @@ ArgParser::Command::add_command(std::string const &cmd_name, std::string const &
 // add sub-command without args and function
 ArgParser::Command &
 ArgParser::Command::add_command(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar,
-                                unsigned cmd_arg_num, Function const &f)
+                                unsigned cmd_arg_num, Function const &f, std::string const &key)
 {
-  check_command(cmd_name);
-  ArgParser::Command command = ArgParser::Command(cmd_name, cmd_description, cmd_envvar, cmd_arg_num, f);
+  std::string lookup_key = key.empty() ? cmd_name : key;
+  check_command(cmd_name, lookup_key);
+  ArgParser::Command command = ArgParser::Command(cmd_name, cmd_description, cmd_envvar, cmd_arg_num, f, lookup_key);
   command._parent            = this;
   _subcommand_list[cmd_name] = command;
   return _subcommand_list[cmd_name];
@@ -313,16 +331,15 @@ ArgParser::Command::add_example_usage(std::string const &usage)
 void
 ArgParser::Command::output_command(std::ostream &out, std::string const &prefix) const
 {
-  if (25 - static_cast<int>(prefix.size() + _name.size()) < 0) {
+  if (INDENT_ONE - static_cast<int>(prefix.size() + _name.size()) < 0) {
     length_error(_name);
   }
-  std::string msg = prefix + _name + ": " + std::string(25 - (prefix.size() + _name.size()), ' ') + _description;
-  if (74 - static_cast<int>(msg.size()) < 0) {
+  std::string msg = prefix + _name + ": " + std::string(INDENT_ONE - (prefix.size() + _name.size()), ' ') + _description;
+  if (INDENT_TWO - static_cast<int>(msg.size()) < 0) {
     length_error(_name);
   }
   // output with a nice format
-  std::cout << msg << std::string(74 - msg.size(), ' ') << argument_number_output(_arg_num) << std::endl;
-
+  std::cout << msg << std::string(INDENT_TWO - msg.size(), ' ') << argument_number_output(_arg_num) << std::endl;
   // recursive call
   for (auto it : _subcommand_list) {
     it.second.output_command(out, "  " + prefix);
@@ -336,15 +353,15 @@ ArgParser::show_parser_info() const
   _top_level_command.show_command_info();
 }
 
-// helper method to handle the arguments and put them nicely in data
+// helper method to handle the arguments and put them nicely in arguments
 static void
 handle_args(ArgParser &base, Arguments &ret, StringArray &args, ArgumentData &data, std::string const &name, unsigned arg_num,
             unsigned &index)
 {
   // handle the args
-  if (arg_num == INFINITE_ARG_NUM || arg_num == AT_LEAST_ONE_ARG_NUM) {
+  if (arg_num == INFINITE_ARG_N || arg_num == MORE_THAN_ONE_ARG_N) {
     // infinite arguments
-    if (arg_num == AT_LEAST_ONE_ARG_NUM && args.size() <= index + 1) {
+    if (arg_num == MORE_THAN_ONE_ARG_N && args.size() <= index + 1) {
       std::cout << "Error: at least one argument expected by " << name << std::endl << std::endl;
       base.help_message();
     }
@@ -370,12 +387,13 @@ handle_args(ArgParser &base, Arguments &ret, StringArray &args, ArgumentData &da
   return;
 }
 
-// append the args of option to parsed data
-static void
+// Append the args of option to parsed data. Return true if there is any option called
+static bool
 append_option_data(ArgParser &base, Arguments &ret, StringArray &args,
                    std::unordered_map<std::string, ArgParser::Option> const &option_list,
                    std::unordered_map<std::string, std::string> const &option_map, int index)
 {
+  bool option_called = false;
   std::unordered_map<std::string, int> check_map;
   for (unsigned i = index; i < args.size(); i++) {
     // find matches of the arg
@@ -392,19 +410,20 @@ append_option_data(ArgParser &base, Arguments &ret, StringArray &args,
         ArgParser::Option cur_option = it->second;
         // handle environment variable
         if (!cur_option.envvar.empty()) {
-          ret.append_env(cur_option.long_option, getenv(cur_option.envvar.c_str()) ? getenv(cur_option.envvar.c_str()) : "");
+          ret.append_env(cur_option.key, getenv(cur_option.envvar.c_str()) ? getenv(cur_option.envvar.c_str()) : "");
         }
-        ret.append_arg(cur_option.long_option, value);
+        ret.append_arg(cur_option.key, value);
         check_map[cur_option.long_option] += 1;
         args.erase(args.begin() + i);
         i -= 1;
+        option_called = true;
       }
     } else {
       // deal with normal --arg val1 val2 ...
-      auto list_it = option_list.find(args[i]);
-      auto map_it  = option_map.find(args[i]);
-      if (list_it != option_list.end() || map_it != option_map.end()) {
-        // arg name match or key match
+      auto long_it  = option_list.find(args[i]);
+      auto short_it = option_map.find(args[i]);
+      // long option match or short option match
+      if (long_it != option_list.end() || short_it != option_map.end()) {
         // output version or help message
         if (args[i] == "--version" || args[i] == "-V") {
           base.version_message();
@@ -414,17 +433,18 @@ append_option_data(ArgParser &base, Arguments &ret, StringArray &args,
         }
         ArgumentData option_data;
         ArgParser::Option cur_option;
-        if (list_it != option_list.end()) {
-          cur_option = list_it->second;
+        if (long_it != option_list.end()) {
+          cur_option = long_it->second;
         } else {
-          cur_option = option_list.at(map_it->second);
+          cur_option = option_list.at(short_it->second);
         }
         // handle environment variable
         if (!cur_option.envvar.empty()) {
           option_data.env_data = getenv(cur_option.envvar.c_str()) ? getenv(cur_option.envvar.c_str()) : "";
         }
         // handle the arguments
-        handle_args(base, ret, args, option_data, cur_option.long_option, cur_option.arg_num, i);
+        handle_args(base, ret, args, option_data, cur_option.key, cur_option.arg_num, i);
+        option_called = true;
       }
     }
   }
@@ -437,14 +457,16 @@ append_option_data(ArgParser &base, Arguments &ret, StringArray &args,
   }
   // put in the default value of options
   for (auto it : option_list) {
-    if (!it.second.default_value.empty() && ret.get(it.first).empty()) {
+    if (!it.second.default_value.empty() && !ret.get(it.first)) {
       std::istringstream ss(it.second.default_value);
       std::string token;
       while (std::getline(ss, token, ' ')) {
-        ret.append_arg(it.first, token);
+        ret.append_arg(it.second.key, token);
       }
+      option_called = true;
     }
   }
+  return option_called;
 }
 
 // Main recursive logic of Parsing
@@ -461,16 +483,20 @@ ArgParser::Command::parse(ArgParser &base, Arguments &ret, StringArray &args)
         cmd_data.env_data = getenv(_envvar.c_str()) ? getenv(_envvar.c_str()) : "";
       }
       // handle the option
-      append_option_data(base, ret, args, _option_list, _option_map, i);
+      if (!append_option_data(base, ret, args, _option_list, _option_map, i) && _option_required) {
+        std::cout << "Error: No valid option found" << std::endl;
+        base.help_message();
+      }
       // handle the action
       if (_f) {
         ret._action = _f;
       }
-      handle_args(base, ret, args, cmd_data, _name, _arg_num, i);
+      handle_args(base, ret, args, cmd_data, _key, _arg_num, i);
       command_called = true;
       break;
     }
   }
+  // check for command required
   if (!command_called && _command_required) {
     std::cout << "Error: No command found" << std::endl;
     base.help_message();
@@ -530,45 +556,14 @@ ArgParser::Command::require_options()
 Arguments::Arguments() {}
 Arguments::~Arguments() {}
 
-std::string
-Arguments::get_env(std::string const &name) const
+ArgumentData
+Arguments::get(std::string const &name)
 {
-  auto it = _data_map.find(name);
-  if (it != _data_map.end()) {
-    return it->second.env_data;
-  } else {
-    return "";
+  if (_data_map.find(name) != _data_map.end()) {
+    _data_map[name].is_called = true;
+    return _data_map[name];
   }
-}
-StringArray
-Arguments::get(std::string const &name) const
-{
-  auto it = _data_map.find(name);
-  if (it != _data_map.end()) {
-    return it->second.arg_data;
-  } else {
-    return StringArray();
-  }
-}
-
-std::string
-Arguments::get(std::string const &name, unsigned index) const
-{
-  auto it = _data_map.find(name);
-  if (it != _data_map.end() && !it->second.arg_data.empty()) {
-    if (index >= it->second.arg_data.size()) {
-      return "";
-    }
-    return it->second.arg_data[index];
-  } else {
-    return "";
-  }
-}
-
-bool
-Arguments::called(std::string const &name) const
-{
-  return _data_map.find(name) != _data_map.end();
+  return ArgumentData();
 }
 
 void
@@ -614,9 +609,31 @@ Arguments::invoke()
     // call the std::function
     return _action();
   } else {
-    std::cerr << "Error: no function to invoke";
+    std::cerr << "Error: no function to invoke" << std::endl;
     exit(1);
   }
 }
+
+//=========================== ArgumentData class ================================
+
+std::string
+ArgumentData::env()
+{
+  return env_data;
+};
+StringArray
+ArgumentData::args()
+{
+  return arg_data;
+};
+std::string
+ArgumentData::at(unsigned index)
+{
+  if (index >= arg_data.size()) {
+    std::cerr << "Error: argument not fonud at index: " << index << std::endl;
+    exit(1);
+  }
+  return arg_data[index];
+};
 
 } // namespace ts
