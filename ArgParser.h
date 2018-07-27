@@ -47,13 +47,18 @@ using Function    = std::function<int()>;
 /// Struct holding both the ENV and String arguments
 struct ArgumentData {
   operator bool() const { return is_called; };
+  std::string operator[](int x) { return arg_data[x]; }
   std::string env();
   StringArray args();
   std::string at(unsigned index);
-  //value(), size(), emtpty()
+  std::string value();
+  size_t size();
+  bool empty();
 
-  std::string env_data;
+  // the arguments stored
   StringArray arg_data;
+  // the environment variable
+  std::string env_data;
   bool is_called = false;
 };
 
@@ -65,7 +70,7 @@ public:
   ~Arguments();
 
   ArgumentData get(std::string const &name);
-  // Append key value pairs to the datamap
+
   void append(std::string const &key, ArgumentData const &value);
   // Append value to the arg to the map of key
   void append_arg(std::string const &key, std::string const &value);
@@ -157,7 +162,7 @@ public:
     std::string _description;
 
     // Expected argument number
-    unsigned _arg_num;
+    unsigned _arg_num = 0;
     // Stored Env variable
     std::string _envvar;
     // An example usage can be added for the help message

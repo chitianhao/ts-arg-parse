@@ -51,35 +51,35 @@ TEST_CASE("Parsing test", "[parse]")
   const char *argv1[] = {"traffic_blabla", "init", "a", "--initoption", "--globalx", "x", "y", NULL};
 
   parsed_data = parser.parse(argv1);
-  REQUIRE(parsed_data.called("init") == true);
-  REQUIRE(parsed_data.called("--globalx") == true);
-  REQUIRE(parsed_data.get_env("--globalx").size() != 0);
-  REQUIRE(parsed_data.called("--initoption") == true);
-  REQUIRE(parsed_data.called("a") == false);
-  REQUIRE(parsed_data.get_env("init").size() != 0);
+  REQUIRE(parsed_data.get("init") == true);
+  REQUIRE(parsed_data.get("globalx") == true);
+  REQUIRE(parsed_data.get("globalx").env().size() != 0);
+  REQUIRE(parsed_data.get("initoption") == true);
+  REQUIRE(parsed_data.get("a") == false);
+  REQUIRE(parsed_data.get("init").env().size() != 0);
   REQUIRE(parsed_data.get("init").size() == 1);
-  REQUIRE(parsed_data.get("init")[0] == "a");
-  REQUIRE(parsed_data.get("--globalx").size() == 2);
-  REQUIRE(parsed_data.get("--globalx")[0] == "x");
-  REQUIRE(parsed_data.get("--globalx")[1] == "y");
+  REQUIRE(parsed_data.get("init").at(0) == "a");
+  REQUIRE(parsed_data.get("globalx").size() == 2);
+  REQUIRE(parsed_data.get("globalx").at(0) == "x");
+  REQUIRE(parsed_data.get("globalx")[1] == "y");
 
   const char *argv2[] = {"traffic_blabla", "init", "i", "subinit", "a", "b", "--initoption2=abc", "--subinitopt", "-y", NULL};
 
   parsed_data = parser.parse(argv2);
-  REQUIRE(parsed_data.called("init") == true);
-  REQUIRE(parsed_data.called("--subinitopt") == true);
-  REQUIRE(parsed_data.called("--globaly") == true);
+  REQUIRE(parsed_data.get("init") == true);
+  REQUIRE(parsed_data.get("subinitopt") == true);
+  REQUIRE(parsed_data.get("globaly") == true);
   REQUIRE(parsed_data.get("subinit").size() == 2);
-  REQUIRE(parsed_data.get("--initoption2").size() == 1);
-  REQUIRE(parsed_data.get("--initoption2")[0] == "abc");
+  REQUIRE(parsed_data.get("initoption2").size() == 1);
+  REQUIRE(parsed_data.get("initoption2")[0] == "abc");
 
   const char *argv3[] = {"traffic_blabla", "-x", "abc", "xyz", "remove", "subremove", "subsubremove", NULL};
 
   parsed_data = parser.parse(argv3);
-  REQUIRE(parsed_data.called("remove") == true);
-  REQUIRE(parsed_data.called("subremove") == true);
-  REQUIRE(parsed_data.called("subsubremove") == true);
-  REQUIRE(parsed_data.get("--globalx").size() == 2);
+  REQUIRE(parsed_data.get("remove") == true);
+  REQUIRE(parsed_data.get("subremove") == true);
+  REQUIRE(parsed_data.get("subsubremove") == true);
+  REQUIRE(parsed_data.get("globalx").size() == 2);
 }
 
 int

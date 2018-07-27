@@ -636,4 +636,25 @@ ArgumentData::at(unsigned index)
   return arg_data[index];
 };
 
+std::string
+ArgumentData::value()
+{
+  if (arg_data.empty()) {
+    return "";
+  }
+  return arg_data[0];
+}
+
+size_t
+ArgumentData::size()
+{
+  return arg_data.size();
+}
+
+bool
+ArgumentData::empty()
+{
+  return arg_data.empty() && env_data.empty();
+}
+
 } // namespace ts
