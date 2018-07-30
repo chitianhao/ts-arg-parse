@@ -34,9 +34,9 @@
 static constexpr unsigned INFINITE_ARG_N = ~0;
 // more than one arguments
 static constexpr unsigned MORE_THAN_ONE_ARG_N = ~0 - 1;
-// some indent magic numbers
-static constexpr int INDENT_ONE = 25;
-static constexpr int INDENT_TWO = 74;
+// customizable indent for help
+static constexpr int INDENT_ONE = 25; // before description
+static constexpr int INDENT_TWO = 74; // before arg_num
 
 namespace ts
 {
@@ -44,22 +44,39 @@ namespace ts
 using StringArray = std::vector<std::string>;
 using Function    = std::function<int()>;
 
-/// Struct holding both the ENV and String arguments
-struct ArgumentData {
-  operator bool() const { return is_called; };
-  std::string operator[](int x) { return arg_data[x]; }
-  std::string env();
-  StringArray args();
-  std::string at(unsigned index);
-  std::string value();
-  size_t size();
-  bool empty();
+// The class holding both the ENV and String arguments
+class ArgumentData
+{
+public:
+  // bool to check if certain command/option is called
+  operator bool() const { return _is_called; };
+  // index accessing []
+  std::string operator[](int x) const { return _values[x]; };
+  // return the Environment variable
+  std::string env() const;
+  // return the arguments string array
+  StringArray args() const;
 
-  // the arguments stored
-  StringArray arg_data;
+  //   StringArray::const_iterator begin() const;
+  //   StringArray::const_iterator end() const;
+
+  // index accessing
+  std::string at(unsigned index) const;
+  // access the first index, equivalent to at(0)
+  std::string value() const;
+  // size of _values
+  size_t size() const;
+  // return true if _values and _env_value are empty
+  bool empty() const;
+
+private:
+  bool _is_called = false;
   // the environment variable
-  std::string env_data;
-  bool is_called = false;
+  std::string _env_value;
+  // the arguments stored
+  StringArray _values;
+
+  friend class Arguments;
 };
 
 // The class holding all the parsed data after ArgParser::parse()
@@ -75,7 +92,7 @@ public:
   // Append value to the arg to the map of key
   void append_arg(std::string const &key, std::string const &value);
   // append env value to the map with key
-  void append_env(std::string const &key, std::string const &value);
+  void set_env(std::string const &key, std::string const &value);
   // Print all we have in the parsed data to the console
   void show_all_configuration() const;
   /** Invoke the function associated with the parsed command.
@@ -91,6 +108,7 @@ private:
   Function _action;
 
   friend class ArgParser;
+  friend class ArgumentData;
 };
 
 // Class of the ArgParser

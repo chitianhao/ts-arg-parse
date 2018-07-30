@@ -52,6 +52,7 @@ TEST_CASE("Parsing test", "[parse]")
 
   parsed_data = parser.parse(argv1);
   REQUIRE(parsed_data.get("init") == true);
+  REQUIRE(parsed_data.get("init").env().empty() == false);
   REQUIRE(parsed_data.get("globalx") == true);
   REQUIRE(parsed_data.get("globalx").env().size() != 0);
   REQUIRE(parsed_data.get("initoption") == true);

@@ -355,9 +355,10 @@ ArgParser::show_parser_info() const
 
 // helper method to handle the arguments and put them nicely in arguments
 static void
-handle_args(ArgParser &base, Arguments &ret, StringArray &args, ArgumentData &data, std::string const &name, unsigned arg_num,
-            unsigned &index)
+handle_args(ArgParser &base, Arguments &ret, StringArray &args, std::string const &name, unsigned arg_num, unsigned &index)
 {
+  ArgumentData data;
+  ret.append(name, data);
   // handle the args
   if (arg_num == INFINITE_ARG_N || arg_num == MORE_THAN_ONE_ARG_N) {
     // infinite arguments
@@ -366,23 +367,22 @@ handle_args(ArgParser &base, Arguments &ret, StringArray &args, ArgumentData &da
       base.help_message();
     }
     for (unsigned j = index + 1; j < args.size(); j++) {
-      data.arg_data.push_back(args[j]);
+      ret.append_arg(name, args[j]);
     }
     args.erase(args.begin() + index, args.end());
-    ret.append(name, data);
     return;
   }
+
   // finite number of argument handling
   for (unsigned j = 0; j < arg_num; j++) {
-    if (args.size() < index + j + 2 || args[index + j + 1].empty() || args[index + j + 1][0] == '-') {
+    if (args.size() < index + j + 2 || args[index + j + 1].empty()) {
       std::cout << "Error: " << arg_num << " argument(s) expected by " << name << std::endl << std::endl;
       base.help_message();
     }
-    data.arg_data.push_back(args[index + j + 1]);
+    ret.append_arg(name, args[index + j + 1]);
   }
   // erase the used arguments and append the data to the return structure
   args.erase(args.begin() + index, args.begin() + index + arg_num + 1);
-  ret.append(name, data);
   index -= 1;
   return;
 }
@@ -410,7 +410,7 @@ append_option_data(ArgParser &base, Arguments &ret, StringArray &args,
         ArgParser::Option cur_option = it->second;
         // handle environment variable
         if (!cur_option.envvar.empty()) {
-          ret.append_env(cur_option.key, getenv(cur_option.envvar.c_str()) ? getenv(cur_option.envvar.c_str()) : "");
+          ret.set_env(cur_option.key, getenv(cur_option.envvar.c_str()) ? getenv(cur_option.envvar.c_str()) : "");
         }
         ret.append_arg(cur_option.key, value);
         check_map[cur_option.long_option] += 1;
@@ -424,6 +424,7 @@ append_option_data(ArgParser &base, Arguments &ret, StringArray &args,
       auto short_it = option_map.find(args[i]);
       // long option match or short option match
       if (long_it != option_list.end() || short_it != option_map.end()) {
+        option_called = true;
         // output version or help message
         if (args[i] == "--version" || args[i] == "-V") {
           base.version_message();
@@ -431,20 +432,18 @@ append_option_data(ArgParser &base, Arguments &ret, StringArray &args,
         if (args[i] == "--help" || args[i] == "-h") {
           base.help_message();
         }
-        ArgumentData option_data;
         ArgParser::Option cur_option;
         if (long_it != option_list.end()) {
           cur_option = long_it->second;
         } else {
           cur_option = option_list.at(short_it->second);
         }
+        // handle the arguments
+        handle_args(base, ret, args, cur_option.key, cur_option.arg_num, i);
         // handle environment variable
         if (!cur_option.envvar.empty()) {
-          option_data.env_data = getenv(cur_option.envvar.c_str()) ? getenv(cur_option.envvar.c_str()) : "";
+          ret.set_env(cur_option.key, getenv(cur_option.envvar.c_str()) ? getenv(cur_option.envvar.c_str()) : "");
         }
-        // handle the arguments
-        handle_args(base, ret, args, option_data, cur_option.key, cur_option.arg_num, i);
-        option_called = true;
       }
     }
   }
@@ -477,11 +476,7 @@ ArgParser::Command::parse(ArgParser &base, Arguments &ret, StringArray &args)
   // iterate through all arguments
   for (unsigned i = 0; i < args.size(); i++) {
     if (_name == args[i]) {
-      // get ENV var first
-      ArgumentData cmd_data;
-      if (!_envvar.empty()) {
-        cmd_data.env_data = getenv(_envvar.c_str()) ? getenv(_envvar.c_str()) : "";
-      }
+      command_called = true;
       // handle the option
       if (!append_option_data(base, ret, args, _option_list, _option_map, i) && _option_required) {
         std::cout << "Error: No valid option found" << std::endl;
@@ -491,8 +486,11 @@ ArgParser::Command::parse(ArgParser &base, Arguments &ret, StringArray &args)
       if (_f) {
         ret._action = _f;
       }
-      handle_args(base, ret, args, cmd_data, _key, _arg_num, i);
-      command_called = true;
+      handle_args(base, ret, args, _key, _arg_num, i);
+      // set ENV var
+      if (!_envvar.empty()) {
+        ret.set_env(_key, getenv(_envvar.c_str()) ? getenv(_envvar.c_str()) : "");
+      }
       break;
     }
   }
@@ -560,7 +558,7 @@ ArgumentData
 Arguments::get(std::string const &name)
 {
   if (_data_map.find(name) != _data_map.end()) {
-    _data_map[name].is_called = true;
+    _data_map[name]._is_called = true;
     return _data_map[name];
   }
   return ArgumentData();
@@ -576,14 +574,14 @@ Arguments::append(std::string const &key, ArgumentData const &value)
 void
 Arguments::append_arg(std::string const &key, std::string const &value)
 {
-  _data_map[key].arg_data.push_back(value);
+  _data_map[key]._values.push_back(value);
 }
 
 void
-Arguments::append_env(std::string const &key, std::string const &value)
+Arguments::set_env(std::string const &key, std::string const &value)
 {
   // perform overwrite for now
-  _data_map[key].env_data = value;
+  _data_map[key]._env_value = value;
 }
 
 void
@@ -593,11 +591,11 @@ Arguments::show_all_configuration() const
     std::cout << "name: " + it.first << std::endl;
     std::string msg;
     msg = "args value:";
-    for (auto it_data : it.second.arg_data) {
+    for (auto it_data : it.second._values) {
       msg += " " + it_data;
     }
     std::cout << msg << std::endl;
-    std::cout << "env value: " + it.second.env_data << std::endl << std::endl;
+    std::cout << "env value: " + it.second._env_value << std::endl << std::endl;
   }
 }
 
@@ -609,52 +607,55 @@ Arguments::invoke()
     // call the std::function
     return _action();
   } else {
-    std::cerr << "Error: no function to invoke" << std::endl;
-    exit(1);
+    throw std::runtime_error("no function to invoke");
+    // std::cerr << "Error: no function to invoke" << std::endl;
+    // exit(1);
   }
 }
 
 //=========================== ArgumentData class ================================
 
 std::string
-ArgumentData::env()
+ArgumentData::env() const
 {
-  return env_data;
-};
+  return _env_value;
+}
+
 StringArray
-ArgumentData::args()
+ArgumentData::args() const
 {
-  return arg_data;
-};
+  return _values;
+}
+
 std::string
-ArgumentData::at(unsigned index)
+ArgumentData::at(unsigned index) const
 {
-  if (index >= arg_data.size()) {
+  if (index >= _values.size()) {
     std::cerr << "Error: argument not fonud at index: " << index << std::endl;
     exit(1);
   }
-  return arg_data[index];
-};
+  return _values[index];
+}
 
 std::string
-ArgumentData::value()
+ArgumentData::value() const
 {
-  if (arg_data.empty()) {
+  if (_values.empty()) {
     return "";
   }
-  return arg_data[0];
+  return _values[0];
 }
 
 size_t
-ArgumentData::size()
+ArgumentData::size() const
 {
-  return arg_data.size();
+  return _values.size();
 }
 
 bool
-ArgumentData::empty()
+ArgumentData::empty() const
 {
-  return arg_data.empty() && env_data.empty();
+  return _values.empty() && _env_value.empty();
 }
 
 } // namespace ts
