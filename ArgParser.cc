@@ -449,14 +449,15 @@ append_option_data(ArgParser &base, Arguments &ret, StringArray &args,
   }
   // check for wrong number of arguments for --arg=...
   for (auto it : check_map) {
-    if (option_list.at(it.first).arg_num != it.second) {
+    unsigned num = option_list.at(it.first).arg_num;
+    if (num != it.second && num < MORE_THAN_ONE_ARG_N) {
       std::cout << "Error: " << option_list.at(it.first).arg_num << " arguments expected by " << it.first << std::endl;
       base.help_message();
     }
   }
   // put in the default value of options
   for (auto it : option_list) {
-    if (!it.second.default_value.empty() && !ret.get(it.first)) {
+    if (!it.second.default_value.empty() && ret.get(it.second.key).empty()) {
       std::istringstream ss(it.second.default_value);
       std::string token;
       while (std::getline(ss, token, ' ')) {
@@ -608,54 +609,59 @@ Arguments::invoke()
     return _action();
   } else {
     throw std::runtime_error("no function to invoke");
-    // std::cerr << "Error: no function to invoke" << std::endl;
-    // exit(1);
   }
 }
 
-//=========================== ArgumentData class ================================
+//=========================== ArgumentsData class ================================
 
-std::string
-ArgumentData::env() const
+std::string const &
+ArgumentData::env() const noexcept
 {
   return _env_value;
 }
 
-StringArray
-ArgumentData::args() const
-{
-  return _values;
-}
-
-std::string
+std::string const &
 ArgumentData::at(unsigned index) const
 {
   if (index >= _values.size()) {
-    std::cerr << "Error: argument not fonud at index: " << index << std::endl;
-    exit(1);
+    throw std::out_of_range("argument not fonud at index: " + std::to_string(index));
   }
-  return _values[index];
+  return _values.at(index);
 }
 
-std::string
-ArgumentData::value() const
+std::string const &
+ArgumentData::value() const noexcept
 {
   if (_values.empty()) {
-    return "";
+    // To prevent compiler warning
+    static const std::string empty = "";
+    return empty;
   }
-  return _values[0];
+  return _values.at(0);
 }
 
 size_t
-ArgumentData::size() const
+ArgumentData::size() const noexcept
 {
   return _values.size();
 }
 
 bool
-ArgumentData::empty() const
+ArgumentData::empty() const noexcept
 {
   return _values.empty() && _env_value.empty();
+}
+
+StringArray::const_iterator
+ArgumentData::begin() const noexcept
+{
+  return _values.begin();
+}
+
+StringArray::const_iterator
+ArgumentData::end() const noexcept
+{
+  return _values.end();
 }
 
 } // namespace ts

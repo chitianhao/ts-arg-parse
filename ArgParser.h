@@ -49,25 +49,22 @@ class ArgumentData
 {
 public:
   // bool to check if certain command/option is called
-  operator bool() const { return _is_called; };
+  operator bool() const noexcept { return _is_called; }
   // index accessing []
-  std::string operator[](int x) const { return _values[x]; };
+  std::string const &operator[](int x) const { return _values.at(x); }
   // return the Environment variable
-  std::string env() const;
-  // return the arguments string array
-  StringArray args() const;
-
-  //   StringArray::const_iterator begin() const;
-  //   StringArray::const_iterator end() const;
-
+  std::string const &env() const noexcept;
+  // iterator for arguments
+  StringArray::const_iterator begin() const noexcept;
+  StringArray::const_iterator end() const noexcept;
   // index accessing
-  std::string at(unsigned index) const;
+  std::string const &at(unsigned index) const;
   // access the first index, equivalent to at(0)
-  std::string value() const;
+  std::string const &value() const noexcept;
   // size of _values
-  size_t size() const;
-  // return true if _values and _env_value are empty
-  bool empty() const;
+  size_t size() const noexcept;
+  // return true if _values and _env_value are both empty
+  bool empty() const noexcept;
 
 private:
   bool _is_called = false;
