@@ -612,7 +612,7 @@ Arguments::invoke()
   }
 }
 
-//=========================== ArgumentsData class ================================
+//=========================== ArgumentData class ================================
 
 std::string const &
 ArgumentData::env() const noexcept

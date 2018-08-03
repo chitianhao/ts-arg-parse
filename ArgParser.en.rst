@@ -37,7 +37,7 @@ Description
 
 :class:`ArgParser` is a powerful and easy-to-use command line Parsing library for ATS.
 The program defines what it requires by adding commands and options.
-Then :class:`ArgParser` will figure out what is related from the command line.
+Then :class:`ArgParser` will figure out the related information from the command line.
 All parsed arguments and function will be put in a key-value pairs structure
 :class:`Arguments` available for users to use.
 
@@ -80,44 +80,45 @@ To add commands to the program or current command:
 
 .. code-block:: cpp
 
-   parser.add_command("command", "description");
-   command1.add_command("command", "description");
-   command2.add_command("command", "description", "ENV_VAR", 0);
-   command3.add_command("command", "description", "ENV_VAR", 0, &function);
+   ts::ArgParser &command1 = parser.add_command("command1", "description");
+   command1.add_command("command2", "description");
+   command1.add_command("command3", "description", "ENV_VAR", 0);
+   command1.add_command("command4", "description", "ENV_VAR", 0, &function, "lookup_key");
 
 This function call returns the new :class:`Command` instance added.
 
 .. Note::
 
-   The 0 here is the number of arguments we expected. It can be also set to `INFINITE_ARG_N`
-   to specify that this command expect all the arguments comes later (infinite).
+   The 0 here is the number of arguments we expected. It can be also set to `INFINITE_ARG_N` or `MORE_THAN_ONE_ARG_N`
+   to specify that this command expects all the arguments comes later (infinite or more than one).
 
 To add options to the parser or current command:
 
 .. code-block:: cpp
 
     parser.add_option("--switch", "-s", "switch description");
-    command1.add_option("--switch", "-s", "switch description");
-    command2.add_option("--switch", "-s", "switch description", "", 0);
+    command1.add_option("--switch", "-s", "switch description", "", 0);
+    command1.add_option("--switch", "-s", "switch description", "ENV_VAR", 1, "default", "lookup_key");
 
 This function call returns the new :class:`Option` instance. (0 is also number of arguments expected)
 
-We can also use the following way to add subcommand or option:
+We can also use the following chained way to add subcommand or option:
 
 .. code-block:: cpp
 
     command.add_command("init", "description").add_command("subinit", "description");
-    command.add_command("init", "description").add_option("-i", "--initoption");
+    command.add_command("remove", "description").add_option("-i", "--initoption");
 
 which is equivalent to
 
 .. code-block:: cpp
 
     ts::ArgParser::Command &init_command = command.add_command("init", "description");
+    ts::ArgParser::Command &remove_command = command.add_command("remove", "description");
     init_command.add_command("subinit", "description");
-    init_command.add_option("-i", "--initoption");
+    remove_command.add_option("-i", "--initoption");
 
-In this case, `subinit` is the subcommand of `init` and `--initoption` is a switch of `init`.
+In this case, `subinit` is the subcommand of `init` and `--initoption` is a switch of command `remove`.
 
 
 Parsing Arguments
@@ -144,75 +145,27 @@ from the :class:`Arguments` object returned from the parsing. The function can b
 Help and Version messages
 -------------------------
 
-- Help message will outputed when wrong usage of the program is detected or `--help` option found.
+- Help message will outputted when a wrong usage of the program is detected or `--help` option found.
 
 - Version message is defined unified in :code:`ArgParser::version_message()`.
 
 Classes
 +++++++
 
-.. class:: Arguments
-
-   :class:`Arguments` holds the parsed arguments and function to invoke.
-   It basically contains a function to invoke and a private map holding key-value pairs.
-   The key is the command or option name string and the value is the Parsed data object which
-   contains the environment variable and arguments that belong to this certain command or option.
-
-   Note: More methods can be added later to get specific type from the arguments.
-
-   .. function:: std::string get_env(std::string const &name)
-
-      Return the ENV variable given the name of command or option.
-
-   .. function:: std::vector<std::string> get(std::string const &name)
-
-      Return the arguments string array given the name of command or option.
-
-   .. function:: std::string get(std::string const &name, unsigned index)
-
-      Return the argument string at the certain index given the name of command or option.
-      This can be an easy use to get the arg of command or option that only expect one argument by
-      simply calling, for example, :code:`std::string path = get("--path", 0);`.
-
-   .. function:: bool called(std::string const &name)
-
-      Check if certain command or option is called. Return true or false.
-
-   .. function:: void append(std::string const &key, ArgumentData const &value)
-
-      Append key-value pairs to the map in :class:`Arguments`.
-
-   .. function:: void show_all_configuration() const
-
-      Show all the called commands, options and associated arguments
-
 .. class:: ArgParser
 
-   .. function:: Option &add_option(std::string const &name, std::string const &key, std::string const &description)
+   .. function:: Option &add_option(std::string const &long_option, std::string const &short_option, std::string const &description, std::string const &envvar = "", unsigned arg_num = 0, std::string const &default_value = "", std::string const &key = "")
 
-      Add an option to current command with only *long name* and *short name*. Return The Option object itself.
+      Add an option to current command with *long name*, *short name*, *help description*, *environment variable*, *arguments expected*, *default value* and *lookup key*. Return The Option object itself.
 
-   .. function:: Option &add_option(std::string const &name, std::string const &key, std::string const &description, std::string const &envvar, unsigned arg_num = 0)
+   .. function:: Command &add_command(std::string const &cmd_name, std::string const &cmd_description, Function const &f = nullptr, std::string const &key = "")
 
-       Add an option to current command with *arguments* and *environment variable*. Return The Option object itself.
+      Add a command with only *name* and *description*, *function to invoke* and *lookup key*. Return the new :class:`Command` object.
 
-   .. function:: Command &add_command(std::string const &cmd_name, std::string const &cmd_description)
+   .. function:: Command &add_command(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar, unsigned cmd_arg_num, std::function<int()> const &f = nullptr, std::string const &key = "")
 
-      Add a command with only *name* and *description*. Return the new Command object.
-
-   .. function:: Command &add_command(std::string const &cmd_name, std::string const &cmd_description, Function const &f)
-
-      Add a command with only *name* and *description* and *function to invoke*. Return the new Command object.
-
-   .. function:: Command &add_command(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar, unsigned cmd_arg_num)
-
-      Add a command with *name*, *description*, *environment variable* and *number of arguments expected*.
-      Return the new Command object.
-
-   .. function:: Command &add_command(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar, unsigned cmd_arg_num, std::function<int()> const &f)
-
-      Add a command with *name*, *description*, *environment variable*, *number of arguments expected* and *function to invoke*.
-      The function can be passed by reference or be a lambda. It returns the new Command object.
+      Add a command with *name*, *description*, *environment variable*, *number of arguments expected*, *function to invoke* and *lookup key*.
+      The function can be passed by reference or be a lambda. It returns the new :class:`Command` object.
 
    .. function:: void parse(const char **argv)
 
@@ -234,9 +187,13 @@ Classes
 
       Add a global_usage for :code:`help_message()`. Example: `traffic_blabla [--SWITCH [ARG]]`.
 
-   .. function:: void require_commands();
+   .. function:: Command &require_commands();
 
-      Make the parser require commands. If no command is fonud, output help message.
+      Make the parser require commands. If no command is found, output help message. Return The :class:`Command` instance for chained calls.
+
+   .. function:: Command &require_options();
+
+      Make the parser require commands. If no command is found, output help message. Return The :class:`Command` instance for chained calls.
 
 .. class:: Option
 
@@ -245,18 +202,20 @@ Classes
 .. code-block:: cpp
 
    struct Option {
-      std::string name;        // long option: --arg
-      std::string key;         // short option: -a
-      std::string description; // help description
-      std::string envvar;      // stored ENV variable
-      unsigned arg_num = 0;    // number of argument expected
+      std::string long_option;   // long option: --arg
+      std::string short_option;  // short option: -a
+      std::string description;   // help description
+      std::string envvar;        // stored ENV variable
+      unsigned arg_num;          // number of argument expected
+      std::string default_value; // default value of option
+      std::string key;           // look-up key
    };
 
 .. class:: Command
 
-   :class:`Command` is a nested structure of command for :class:`ArgParser`. The :code:`add_option()` and :code:`add_command()`
-   are the same with those in :class:`ArgParser`. When :code:`add_command()` is called under certain command, it will be
-   added as a subcommand for the current command. For Example, :code:`command1.add_command("command2", "description")`
+   :class:`Command` is a nested structure of command for :class:`ArgParser`. The :code:`add_option()`, :code:`add_command()` and
+   :code:`require_command()` / :code:`require_option()` are the same with those in :class:`ArgParser`. When :code:`add_command()`
+   is called under certain command, it will be added as a subcommand for the current command. For Example, :code:`command1.add_command("command2", "description")`
    will make :code:`command2` a subcommand of :code:`command1`. :code:`require_commands()` is also available within :class:`Command`.
 
    .. function:: void add_example_usage(std::string const &usage)
@@ -264,9 +223,75 @@ Classes
       Add an example usage for the command to output in `help_message`.
       For Example: :code:`command.add_example_usage("traffic_blabla init --path=/path/to/file")`.
 
+.. class:: Arguments
+
+   :class:`Arguments` holds the parsed arguments and function to invoke.
+   It basically contains a function to invoke and a private map holding key-value pairs.
+   The key is the command or option name string and the value is the Parsed data object which
+   contains the environment variable and arguments that belong to this certain command or option.
+
+   .. function:: std::string get(std::string const &name)
+
+      Return the :class:`ArgumentData` object related to the name.
+
+   .. function:: std::string set_env(std::string const &key, std::string const &value);
+
+      Set the environment variable given `key`.
+
+   .. function:: void append(std::string const &key, ArgumentData const &value)
+
+      Append key-value pairs to the map in :class:`Arguments`.
+
+   .. function:: void append_arg(std::string const &key, std::string const &value);
+
+      Append `value` to the data of `key`.
+
+   .. function:: void show_all_configuration() const
+
+      Show all the called commands, options and associated arguments.
+
 .. class:: ArgumentData
 
-   :class:`ArgumentData` is a struct containing the parsed Environment variable and commandline arguments.
+   :class:`ArgumentData` is a struct containing the parsed Environment variable and command line arguments.
+   There are methods to get the data out of it.
+
+   Note: More methods can be added later to get specific types from the arguments.
+
+   .. function:: operator bool() const noexcept
+
+      `bool` for checking if certain command or option is called.
+
+   .. function:: std::string const &operator[](int x) const
+
+      Index accessing operator.
+
+   .. function:: std::string const &operator[](int x) const
+
+      Index accessing operator.
+
+   .. function:: StringArray::const_iterator begin() const noexcept
+
+      Begin iterator for iterating the arguments data.
+
+   .. function:: StringArray::const_iterator end() const noexcept
+
+      End iterator for iterating the arguments data.
+
+   .. function:: std::string const &at(unsigned index) const
+
+      Index accessing method.
+
+   .. function:: std::string const &value() const noexcept
+
+      The first element of the arguments data.
+
+   .. function:: size_t size() const noexcept
+
+      Return the size of the arguments vector
+
+   .. function:: size_t empty() const noexcept
+
+      Return true if the arguments vector and env variable are empty.
 
 Example
 +++++++
