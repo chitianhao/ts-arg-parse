@@ -31,12 +31,13 @@
 #include <string_view>
 
 // more than zero arguments
-static constexpr unsigned INFINITE_ARG_N = ~0;
+static constexpr unsigned MORE_THAN_ZERO_ARG_N = ~0;
 // more than one arguments
 static constexpr unsigned MORE_THAN_ONE_ARG_N = ~0 - 1;
 // customizable indent for help
-static constexpr int INDENT_ONE = 25; // before description
-static constexpr int INDENT_TWO = 74; // before arg_num
+static constexpr int INDENT_ONE   = 23; // command help message before Args
+static constexpr int INDENT_TWO   = 33; // command help message before Description
+static constexpr int INDENT_THREE = 46; // option help message before Description
 
 namespace ts
 {
@@ -168,8 +169,12 @@ public:
     // Helper method for ArgParser::help_message
     void output_command(std::ostream &out, std::string const &prefix) const;
     // Helper method for ArgParser::parse
-    bool parse(ArgParser &base, Arguments &ret, StringArray &args);
-
+    bool parse(Arguments &ret, StringArray &args);
+    // The help & version messages
+    void help_message(std::string_view err = "") const;
+    void version_message() const;
+    // Helpr method for parse()
+    bool append_option_data(Arguments &ret, StringArray &args, int index);
     // The parent of current command
     Command *_parent = nullptr;
     // The command name and help message
@@ -228,9 +233,6 @@ public:
   Arguments parse(const char **argv);
   // Show all information(command, option, envvar ...) of the parser
   void show_parser_info() const;
-  // The help & version messages
-  void help_message() const;
-  void version_message() const;
   // Add the usage to global_usage for help_message(). Something like: traffic_blabla [--SWITCH [ARG]]
   void add_global_usage(std::string const &usage);
 
@@ -245,8 +247,6 @@ protected:
   StringArray _argv;
   // the top level command object for program use
   Command _top_level_command;
-  // global usage of the program
-  std::string _global_usage;
 
   friend class Command;
   friend class Arguments;
