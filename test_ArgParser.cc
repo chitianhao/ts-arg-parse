@@ -40,7 +40,7 @@ TEST_CASE("Parsing test", "[parse]")
   parser.add_option("--globalz", "-z", "global switch z", "", MORE_THAN_ONE_ARG_N);
 
   ts::ArgParser::Command &init_command   = parser.add_command("init", "initialize traffic blabla", "ENV_TEST2", 1, nullptr);
-  ts::ArgParser::Command &remove_command = parser.add_command("remove", "remove traffic blabla");
+  auto &remove_command = parser.add_command("remove", "remove traffic blabla");
 
   init_command.add_option("--initoption", "-i", "init option");
   init_command.add_option("--initoption2", "-j", "init2 option", "", 1, "");

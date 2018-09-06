@@ -51,7 +51,7 @@ An object containing all information and parsed arguments available to use will 
 
 Create a parser
 ---------------
-The first step to use argparse is to create a parser.
+The first step to use ArgParser is to create a parser.
 The parser can be created simply by calling:
 
 .. code-block:: cpp
@@ -90,7 +90,7 @@ This function call returns the new :class:`Command` instance added.
 .. Note::
 
    The 0 here is the number of arguments we expected. It can be also set to `MORE_THAN_ZERO_ARG_N` or `MORE_THAN_ONE_ARG_N`
-   to specify that this command expects all the arguments comes later (more than zero or more than one).
+   to specify that this command expects all the arguments come later (more than zero or more than one).
 
 To add options to the parser or current command:
 
@@ -136,7 +136,7 @@ Invoke functions
 ----------------
 
 To invoke the function associated with certain commands, we can perform this by simply calling :code:`invoke()`
-from the :class:`Arguments` object returned from the parsing. The function can be lambda.
+from the :class:`Arguments` object returned from the parsing. The function can be a lambda.
 
 .. code-block:: cpp
 
@@ -145,7 +145,7 @@ from the :class:`Arguments` object returned from the parsing. The function can b
 Help and Version messages
 -------------------------
 
-- Help message will outputted when a wrong usage of the program is detected or `--help` option found.
+- Help message will be outputted when a wrong usage of the program is detected or `--help` option found.
 
 - Version message is defined unified in :code:`ArgParser::version_message()`.
 
@@ -158,7 +158,7 @@ Classes
 
       Add an option to current command with *long name*, *short name*, *help description*, *environment variable*, *arguments expected*, *default value* and *lookup key*. Return The Option object itself.
 
-   .. function:: Command &add_command(std::string const &cmd_name, std::string const &cmd_description, Function const &f = nullptr, std::string const &key = "")
+   .. function:: Command &add_command(std::string const &cmd_name, std::string const &cmd_description, std::function<int()> const &f = nullptr, std::string const &key = "")
 
       Add a command with only *name* and *description*, *function to invoke* and *lookup key*. Return the new :class:`Command` object.
 
@@ -187,11 +187,7 @@ Classes
 
       Add a global_usage for :code:`help_message()`. Example: `traffic_blabla [--SWITCH [ARG]]`.
 
-   .. function:: Command &require_commands();
-
-      Make the parser require commands. If no command is found, output help message. Return The :class:`Command` instance for chained calls.
-
-   .. function:: Command &require_options();
+   .. function:: Command &require_commands()
 
       Make the parser require commands. If no command is found, output help message. Return The :class:`Command` instance for chained calls.
 
@@ -214,7 +210,7 @@ Classes
 .. class:: Command
 
    :class:`Command` is a nested structure of command for :class:`ArgParser`. The :code:`add_option()`, :code:`add_command()` and
-   :code:`require_command()` / :code:`require_option()` are the same with those in :class:`ArgParser`. When :code:`add_command()`
+   :code:`require_command()` are the same with those in :class:`ArgParser`. When :code:`add_command()`
    is called under certain command, it will be added as a subcommand for the current command. For Example, :code:`command1.add_command("command2", "description")`
    will make :code:`command2` a subcommand of :code:`command1`. :code:`require_commands()` is also available within :class:`Command`.
 
@@ -234,7 +230,7 @@ Classes
 
       Return the :class:`ArgumentData` object related to the name.
 
-   .. function:: std::string set_env(std::string const &key, std::string const &value);
+   .. function:: std::string set_env(std::string const &key, std::string const &value)
 
       Set the environment variable given `key`.
 
@@ -242,13 +238,13 @@ Classes
 
       Append key-value pairs to the map in :class:`Arguments`.
 
-   .. function:: void append_arg(std::string const &key, std::string const &value);
+   .. function:: void append_arg(std::string const &key, std::string const &value)
 
       Append `value` to the data of `key`.
 
    .. function:: void show_all_configuration() const
 
-      Show all the called commands, options and associated arguments.
+      Show all the called commands, options, and associated arguments.
 
 .. class:: ArgumentData
 
@@ -265,15 +261,15 @@ Classes
 
       Index accessing operator.
 
-   .. function:: std::string const &operator[](int x) const
+   .. function:: std::string const &env() const noexcept
 
-      Index accessing operator.
+      Return the environment variable associated with the argument.
 
-   .. function:: StringArray::const_iterator begin() const noexcept
+   .. function:: std::vector<std::string>::const_iterator begin() const noexcept
 
       Begin iterator for iterating the arguments data.
 
-   .. function:: StringArray::const_iterator end() const noexcept
+   .. function:: std::vector<std::string>::const_iterator end() const noexcept
 
       End iterator for iterating the arguments data.
 
@@ -325,7 +321,7 @@ This program will have such functionality:
         parser.add_command("func", "some function", "ENV_VAR", 2, &function);
         parser.add_command("func2", "some function2", [&]() { return function2(100); });
 
-        ts::ArgParser::Command &init_command = parser.add_command("init", "initialize");
+        auto &init_command = parser.add_command("init", "initialize");
         init_command.add_option("--path", "-p", "specify the path", "", 1);
         init_command.add_command("subinit", "sub initialize");
 
@@ -335,3 +331,5 @@ This program will have such functionality:
         parsed_data.invoke();
         ...
     }
+
+To get the values from the arguments data, please refer to the methods in :class:`ArgumentData`

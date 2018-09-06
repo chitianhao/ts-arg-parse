@@ -34,10 +34,10 @@
 static constexpr unsigned MORE_THAN_ZERO_ARG_N = ~0;
 // more than one arguments
 static constexpr unsigned MORE_THAN_ONE_ARG_N = ~0 - 1;
-// customizable indent for help
-static constexpr int INDENT_ONE   = 23; // command help message before Args
-static constexpr int INDENT_TWO   = 33; // command help message before Description
-static constexpr int INDENT_THREE = 46; // option help message before Description
+// customizable indent for help message
+static constexpr int INDENT_ONE   = 24;
+static constexpr int INDENT_TWO   = 32;
+static constexpr int INDENT_THREE = 46;
 
 namespace ts
 {
@@ -135,7 +135,7 @@ public:
     /** Add an option to current command
         @return The Option object.
     */
-    Option &add_option(std::string const &long_option, std::string const &short_option, std::string const &description,
+    Command &add_option(std::string const &long_option, std::string const &short_option, std::string const &description,
                        std::string const &envvar = "", unsigned arg_num = 0, std::string const &default_value = "",
                        std::string const &key = "");
 
@@ -154,7 +154,6 @@ public:
         @return The Command instance for chained calls.
     */
     Command &require_commands();
-    Command &require_options();
 
   protected:
     // Main constructor called by add_command()
@@ -174,7 +173,7 @@ public:
     void help_message(std::string_view err = "") const;
     void version_message() const;
     // Helpr method for parse()
-    bool append_option_data(Arguments &ret, StringArray &args, int index);
+    void append_option_data(Arguments &ret, StringArray &args, int index);
     // The parent of current command
     Command *_parent = nullptr;
     // The command name and help message
@@ -203,19 +202,19 @@ public:
 
     // require command / option for this parser
     bool _command_required = false;
-    bool _option_required  = false;
 
     friend class ArgParser;
   };
   // Base class constructors and destructor
   ArgParser();
-  ArgParser(std::string_view name, std::string_view description, std::string_view envvar, unsigned arg_num, Function const &f);
+  ArgParser(std::string const &name, std::string const &description, std::string const &envvar, unsigned arg_num,
+            Function const &f);
   ~ArgParser();
 
   /** Add an option to current command with arguments
       @return The Option object.
   */
-  Option &add_option(std::string const &long_option, std::string const &short_option, std::string const &description,
+  Command &add_option(std::string const &long_option, std::string const &short_option, std::string const &description,
                      std::string const &envvar = "", unsigned arg_num = 0, std::string const &default_value = "",
                      std::string const &key = "");
 
@@ -235,12 +234,12 @@ public:
   void show_parser_info() const;
   // Add the usage to global_usage for help_message(). Something like: traffic_blabla [--SWITCH [ARG]]
   void add_global_usage(std::string const &usage);
-
+  // help message that can be called
+  void help_message(std::string_view err = "") const;
   /** Require subcommand/options for this command
       @return The Command instance for chained calls.
   */
   Command &require_commands();
-  Command &require_options();
 
 protected:
   // Converted from 'const char **argv' for the use of parsing and help
