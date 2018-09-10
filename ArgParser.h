@@ -43,7 +43,7 @@ namespace ts
 {
 // Some type def
 using StringArray = std::vector<std::string>;
-using Function    = std::function<int()>;
+using Function    = std::function<void()>;
 
 // The class holding both the ENV and String arguments
 class ArgumentData
@@ -96,7 +96,7 @@ public:
   /** Invoke the function associated with the parsed command.
       @return The return value of the executed command (int).
   */
-  int invoke();
+  void invoke();
 
 private:
   // A map of all the called parsed args/data
@@ -136,8 +136,8 @@ public:
         @return The Option object.
     */
     Command &add_option(std::string const &long_option, std::string const &short_option, std::string const &description,
-                       std::string const &envvar = "", unsigned arg_num = 0, std::string const &default_value = "",
-                       std::string const &key = "");
+                        std::string const &envvar = "", unsigned arg_num = 0, std::string const &default_value = "",
+                        std::string const &key = "");
 
     /** Two ways of adding a sub-command to current command:
         @return The new sub-command instance.
@@ -215,8 +215,8 @@ public:
       @return The Option object.
   */
   Command &add_option(std::string const &long_option, std::string const &short_option, std::string const &description,
-                     std::string const &envvar = "", unsigned arg_num = 0, std::string const &default_value = "",
-                     std::string const &key = "");
+                      std::string const &envvar = "", unsigned arg_num = 0, std::string const &default_value = "",
+                      std::string const &key = "");
 
   /** Two ways of adding command to the parser:
       @return The new command instance.
@@ -240,6 +240,8 @@ public:
       @return The Command instance for chained calls.
   */
   Command &require_commands();
+  // user-customized error message output
+  std::string error;
 
 protected:
   // Converted from 'const char **argv' for the use of parsing and help

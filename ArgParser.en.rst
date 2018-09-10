@@ -158,11 +158,11 @@ Classes
 
       Add an option to current command with *long name*, *short name*, *help description*, *environment variable*, *arguments expected*, *default value* and *lookup key*. Return The Option object itself.
 
-   .. function:: Command &add_command(std::string const &cmd_name, std::string const &cmd_description, std::function<int()> const &f = nullptr, std::string const &key = "")
+   .. function:: Command &add_command(std::string const &cmd_name, std::string const &cmd_description, std::function<void()> const &f = nullptr, std::string const &key = "")
 
       Add a command with only *name* and *description*, *function to invoke* and *lookup key*. Return the new :class:`Command` object.
 
-   .. function:: Command &add_command(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar, unsigned cmd_arg_num, std::function<int()> const &f = nullptr, std::string const &key = "")
+   .. function:: Command &add_command(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar, unsigned cmd_arg_num, std::function<void()> const &f = nullptr, std::string const &key = "")
 
       Add a command with *name*, *description*, *environment variable*, *number of arguments expected*, *function to invoke* and *lookup key*.
       The function can be passed by reference or be a lambda. It returns the new :class:`Command` object.
@@ -279,7 +279,7 @@ Classes
 
    .. function:: std::string const &value() const noexcept
 
-      The first element of the arguments data.
+      Return the first element of the arguments data.
 
    .. function:: size_t size() const noexcept
 
@@ -287,10 +287,13 @@ Classes
 
    .. function:: size_t empty() const noexcept
 
-      Return true if the arguments vector and env variable are empty.
+      Return true if the arguments vector and env variable are both empty.
 
 Example
 +++++++
+
+ArgParser
+---------
 
 Below is a short example of using the ArgParser. We add some options and some commands to it using different ways.
 This program will have such functionality:
@@ -305,11 +308,11 @@ This program will have such functionality:
 
     #include "ts/ArgParser.h"
 
-    int function() {
+    void function() {
         ...
     }
 
-    int function2(int num) {
+    void function2(int num) {
         ...
     }
 
@@ -332,4 +335,6 @@ This program will have such functionality:
         ...
     }
 
+Arguments
+---------
 To get the values from the arguments data, please refer to the methods in :class:`ArgumentData`

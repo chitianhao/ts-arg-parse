@@ -368,24 +368,6 @@ ArgParser::Command::append_option_data(Arguments &ret, StringArray &args, int in
 {
   std::unordered_map<std::string, unsigned> check_map;
   for (unsigned i = index; i < args.size(); i++) {
-    // output version message
-    if (args[i] == "--version" || args[i] == "-V") {
-      version_message();
-    }
-    // output help message
-    ArgParser::Command command = *this;
-    if (args[i] == "--help" || args[i] == "-h") {
-      // find the correct level to output help messsage
-      for (unsigned i = 1; i < args.size(); i++) {
-        auto it = command._subcommand_list.find(args[i]);
-        if (it == _subcommand_list.end()) {
-          break;
-        }
-        ArgParser::Command tmp = it->second;
-        command                = tmp;
-      }
-      command.help_message();
-    }
     // find matches of the arg
     if (args[i][0] == '-' && args[i][1] == '-' && args[i].find('=') != std::string::npos) {
       // deal with --args=
@@ -407,6 +389,24 @@ ArgParser::Command::append_option_data(Arguments &ret, StringArray &args, int in
         i -= 1;
       }
     } else {
+      // output version message
+      if (args[i] == "--version" || args[i] == "-V") {
+        version_message();
+      }
+      // output help message
+      ArgParser::Command command = *this;
+      if (args[i] == "--help" || args[i] == "-h") {
+        // find the correct level to output help messsage
+        for (unsigned i = 1; i < args.size(); i++) {
+          auto it = command._subcommand_list.find(args[i]);
+          if (it == _subcommand_list.end()) {
+            break;
+          }
+          ArgParser::Command tmp = it->second;
+          command                = tmp;
+        }
+        command.help_message();
+      }
       // deal with normal --arg val1 val2 ...
       auto long_it  = _option_list.find(args[i]);
       auto short_it = _option_map.find(args[i]);
@@ -577,12 +577,12 @@ Arguments::show_all_configuration() const
 }
 
 // invoke the function with the args
-int
+void
 Arguments::invoke()
 {
   if (_action) {
     // call the std::function
-    return _action();
+    _action();
   } else {
     throw std::runtime_error("no function to invoke");
   }

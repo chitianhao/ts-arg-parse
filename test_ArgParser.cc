@@ -24,13 +24,15 @@
 #define CATCH_CONFIG_MAIN
 
 #include "catch.hpp"
-// #include <ts/ArgParser.h>
 #include "ArgParser.h"
+
+int global;
+ts::ArgParser parser;
+ts::ArgParser parser2;
 
 TEST_CASE("Parsing test", "[parse]")
 {
   // initialize and construct the parser
-  ts::ArgParser parser;
   parser.add_global_usage("traffic_blabla [--SWITCH]");
 
   setenv("ENV_TEST", "env_test", 0);
@@ -40,7 +42,7 @@ TEST_CASE("Parsing test", "[parse]")
   parser.add_option("--globalz", "-z", "global switch z", "", MORE_THAN_ONE_ARG_N);
 
   ts::ArgParser::Command &init_command   = parser.add_command("init", "initialize traffic blabla", "ENV_TEST2", 1, nullptr);
-  auto &remove_command = parser.add_command("remove", "remove traffic blabla");
+  ts::ArgParser::Command &remove_command = parser.add_command("remove", "remove traffic blabla");
 
   init_command.add_option("--initoption", "-i", "init option");
   init_command.add_option("--initoption2", "-j", "init2 option", "", 1, "");
@@ -100,43 +102,48 @@ TEST_CASE("Parsing test", "[parse]")
   REQUIRE(parsed_data.get("globalz").size() == 3);
 }
 
-int
+void
 test_method_1()
 {
-  return 0;
+  global        = 0;
+  parser2.error = "error";
+  return;
 }
 
-int
+void
 test_method_2(int num)
 {
   if (num == 1) {
-    return 1;
+    global = 1;
+  } else {
+    global = 2;
   }
-  return 2;
 }
 
 TEST_CASE("Invoke test", "[invoke]")
 {
-  ts::ArgParser parser;
   int num = 1;
 
-  parser.add_global_usage("traffic_blabla [--SWITCH]");
+  parser2.add_global_usage("traffic_blabla [--SWITCH]");
   // function by reference
-  parser.add_command("func", "some test function 1", "", 0, &test_method_1);
+  parser2.add_command("func", "some test function 1", "", 0, &test_method_1);
   // lambda
-  parser.add_command("func2", "some test function 2", "", 0, [&]() { return test_method_2(num); });
+  parser2.add_command("func2", "some test function 2", "", 0, [&]() { return test_method_2(num); });
 
   ts::Arguments parsed_data;
 
   const char *argv1[] = {"traffic_blabla", "func", NULL};
 
-  parsed_data = parser.parse(argv1);
-  REQUIRE(parsed_data.invoke() == 0);
+  parser2.parse(argv1).invoke();
+  REQUIRE(global == 0);
+  REQUIRE(parser2.error == "error");
 
   const char *argv2[] = {"traffic_blabla", "func2", NULL};
 
-  parsed_data = parser.parse(argv2);
-  REQUIRE(parsed_data.invoke() == 1);
+  parsed_data = parser2.parse(argv2);
+  parsed_data.invoke();
+  REQUIRE(global == 1);
   num = 3;
-  REQUIRE(parsed_data.invoke() == 2);
+  parsed_data.invoke();
+  REQUIRE(global == 2);
 }
