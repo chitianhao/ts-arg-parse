@@ -171,10 +171,6 @@ Classes
 
       Parse the command line by calling :code:`parser.parse(argv)`. Return the new :class:`Arguments` instance.
 
-   .. function:: void show_parser_info() const
-
-      Show information of all the commands and options added to the parser.
-
    .. function:: void help_message() const
 
       Output usage to the console.

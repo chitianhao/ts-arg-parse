@@ -219,20 +219,11 @@ ArgParser::Command::check_option(std::string const &long_option, std::string con
     exit(1);
   }
   // find if existing in option list
-  auto long_it  = _option_list.find(long_option);
-  auto short_it = _option_map.find(short_option);
-  if (long_it != _option_list.end() || short_it != _option_map.end()) {
-    std::string msg;
-    if (long_it != _option_list.end()) {
-      msg = "Error: long option '" + long_option;
-    } else {
-      msg = "Error: short option '" + short_option;
-    }
-    if (_parent) {
-      std::cerr << msg + "' already exists under command: " + _name << std::endl;
-    } else {
-      std::cerr << msg + "' already exists in current program" << std::endl;
-    }
+  if (_option_list.find(long_option) != _option_list.end()) {
+    std::cerr << "Error: long option '" + long_option + "' already existed" << std::endl;
+    exit(1);
+  } else if (_option_map.find(short_option) != _option_map.end()) {
+    std::cerr << "Error: short option '" + short_option + "' already existed" << std::endl;
     exit(1);
   }
 }
@@ -276,9 +267,7 @@ ArgParser::Command::add_command(std::string const &cmd_name, std::string const &
 {
   std::string lookup_key = key.empty() ? cmd_name : key;
   check_command(cmd_name, lookup_key);
-  ArgParser::Command command = ArgParser::Command(cmd_name, cmd_description, "", 0, f, lookup_key);
-  command._parent            = this;
-  _subcommand_list[cmd_name] = command;
+  _subcommand_list[cmd_name] = ArgParser::Command(cmd_name, cmd_description, "", 0, f, lookup_key);
   return _subcommand_list[cmd_name];
 }
 
@@ -289,9 +278,7 @@ ArgParser::Command::add_command(std::string const &cmd_name, std::string const &
 {
   std::string lookup_key = key.empty() ? cmd_name : key;
   check_command(cmd_name, lookup_key);
-  ArgParser::Command command = ArgParser::Command(cmd_name, cmd_description, cmd_envvar, cmd_arg_num, f, lookup_key);
-  command._parent            = this;
-  _subcommand_list[cmd_name] = command;
+  _subcommand_list[cmd_name] = ArgParser::Command(cmd_name, cmd_description, cmd_envvar, cmd_arg_num, f, lookup_key);
   return _subcommand_list[cmd_name];
 }
 
@@ -321,13 +308,6 @@ ArgParser::Command::output_command(std::ostream &out, std::string const &prefix)
   for (auto it : _subcommand_list) {
     it.second.output_command(out, "  " + prefix);
   }
-}
-
-void
-ArgParser::show_parser_info() const
-{
-  std::cout << "Parser information:\n" << std::endl;
-  _top_level_command.show_command_info();
 }
 
 // helper method to handle the arguments and put them nicely in arguments
@@ -366,7 +346,7 @@ handle_args(Arguments &ret, StringArray &args, std::string const &name, unsigned
 void
 ArgParser::Command::append_option_data(Arguments &ret, StringArray &args, int index)
 {
-  std::unordered_map<std::string, unsigned> check_map;
+  std::map<std::string, unsigned> check_map;
   for (unsigned i = index; i < args.size(); i++) {
     // find matches of the arg
     if (args[i][0] == '-' && args[i][1] == '-' && args[i].find('=') != std::string::npos) {
@@ -490,33 +470,6 @@ ArgParser::Command::parse(Arguments &ret, StringArray &args)
     }
   }
   return command_called;
-}
-
-void
-ArgParser::Command::show_command_info() const
-{
-  // show the command information
-  std::cout << "name: " + _name << std::endl;
-  std::cout << "description: " + _description << std::endl;
-  std::cout << "ENV variable: " + _envvar << std::endl;
-  std::cout << "expected arguments: " << _arg_num << std::endl;
-  if (_parent) {
-    std::cout << "Parent Command: " + _parent->_name << std::endl;
-  }
-  std::cout << std::endl;
-  // show the options information
-  for (auto it : _option_list) {
-    std::cout << "Long option: " + it.second.long_option << std::endl;
-    std::cout << "Short option: " + it.second.short_option << std::endl;
-    std::cout << "Option description: " + it.second.description << std::endl;
-    std::cout << "Option ENV variable: " + it.second.envvar << std::endl;
-    std::cout << "Option expected arguments: " << it.second.arg_num << std::endl;
-    std::cout << "Option parent: " + _name << std::endl << std::endl;
-  }
-  // recusive call
-  for (auto it : _subcommand_list) {
-    it.second.show_command_info();
-  }
 }
 
 ArgParser::Command &

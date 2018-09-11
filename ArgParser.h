@@ -25,7 +25,7 @@
 
 #include <iostream>
 #include <string>
-#include <unordered_map>
+#include <map>
 #include <vector>
 #include <functional>
 #include <string_view>
@@ -101,7 +101,7 @@ public:
 private:
   // A map of all the called parsed args/data
   // Key: "command/option", value: ENV and args
-  std::unordered_map<std::string, ArgumentData> _data_map;
+  std::map<std::string, ArgumentData> _data_map;
   // The function associated. invoke() will call this func
   Function _action;
 
@@ -163,8 +163,6 @@ public:
     void check_option(std::string const &long_option, std::string const &short_option, std::string const &key) const;
     // Helper method for add_command to check the validity of command
     void check_command(std::string const &name, std::string const &key) const;
-    // Helper method for ArgParser::show_parser_info
-    void show_command_info() const;
     // Helper method for ArgParser::help_message
     void output_command(std::ostream &out, std::string const &prefix) const;
     // Helper method for ArgParser::parse
@@ -174,8 +172,6 @@ public:
     void version_message() const;
     // Helpr method for parse()
     void append_option_data(Arguments &ret, StringArray &args, int index);
-    // The parent of current command
-    Command *_parent = nullptr;
     // The command name and help message
     std::string _name;
     std::string _description;
@@ -193,12 +189,12 @@ public:
 
     // list of all subcommands of current command
     // Key: command name. Value: Command object
-    std::unordered_map<std::string, Command> _subcommand_list;
+    std::map<std::string, Command> _subcommand_list;
     // list of all options of current command
     // Key: option name. Value: Option object
-    std::unordered_map<std::string, Option> _option_list;
+    std::map<std::string, Option> _option_list;
     // Map for fast searching: <short option: long option>
-    std::unordered_map<std::string, std::string> _option_map;
+    std::map<std::string, std::string> _option_map;
 
     // require command / option for this parser
     bool _command_required = false;
@@ -230,8 +226,6 @@ public:
       @return The Arguments object available for program using
   */
   Arguments parse(const char **argv);
-  // Show all information(command, option, envvar ...) of the parser
-  void show_parser_info() const;
   // Add the usage to global_usage for help_message(). Something like: traffic_blabla [--SWITCH [ARG]]
   void add_global_usage(std::string const &usage);
   // help message that can be called
