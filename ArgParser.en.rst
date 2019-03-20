@@ -44,10 +44,12 @@ All parsed arguments and function will be put in a key-value pairs structure
 Usage
 +++++
 
-The usage of the ArgParser is straightforward. The user is expected to create an
-ArgParser for the program. Commands and options can be added to the parser with details
-including ENV variable, arguments expected, etc. After a single method :code:`parse(argv)` is called,
-An object containing all information and parsed arguments available to use will be returned.
+The usage of the ArgParser is straightforward. An :code:`ArgParser` instance is
+created. Commands and options are then added to this instance, along with
+details including ENV variable, arguments expected, etc. The method
+:code:`parse(argv)` is called, passing the :code:`argv` from the command line
+(:code:`main` function arguments). An object containing the parsed command line
+information will be returned.
 
 Create a parser
 ---------------
@@ -58,7 +60,7 @@ The parser can be created simply by calling:
 
    ts::ArgParser parser;
 
-or initialize with the following arguments: 
+or initialize with the following arguments:
 *name, help description, environment variable, argument number expected, function*
 
 .. code-block:: cpp
@@ -183,9 +185,21 @@ Classes
 
       Add a global_usage for :code:`help_message()`. Example: `traffic_blabla [--SWITCH [ARG]]`.
 
+   .. function:: void set_default_command(std::string const &cmd)
+
+      Set a default command to the parser. This method should be called after the adding of the commands.
+
    .. function:: Command &require_commands()
 
       Make the parser require commands. If no command is found, output help message. Return The :class:`Command` instance for chained calls.
+
+   .. function:: void set_error(std::string e)
+
+      Set the user customized error message for the parser.
+
+   .. function:: std::string get_error() const
+
+      Return the error message of the parser.
 
 .. class:: Option
 
@@ -215,6 +229,10 @@ Classes
       Add an example usage for the command to output in `help_message`.
       For Example: :code:`command.add_example_usage("traffic_blabla init --path=/path/to/file")`.
 
+   .. function:: Command &set_default()
+
+      set the current command as default
+
 .. class:: Arguments
 
    :class:`Arguments` holds the parsed arguments and function to invoke.
@@ -241,6 +259,14 @@ Classes
    .. function:: void show_all_configuration() const
 
       Show all the called commands, options, and associated arguments.
+
+   .. function:: void invoke()
+
+      Invoke the function associated with the parsed command.
+
+   .. function:: void has_action() const
+
+      return true if there is any function to invoke.
 
 .. class:: ArgumentData
 
@@ -325,7 +351,7 @@ This program will have such functionality:
         init_command.add_command("subinit", "sub initialize");
 
         parser.add_command("remove", "remove things").add_option("--path", "-p", "specify the path", "HOME", 1);
-        
+
         ts::Arguments parsed_data = parser.parse(argv);
         parsed_data.invoke();
         ...
@@ -333,4 +359,4 @@ This program will have such functionality:
 
 Arguments
 ---------
-To get the values from the arguments data, please refer to the methods in :class:`ArgumentData`
+To get the values from the arguments data, please refer to the methods in :class:`Arguments` and :class:`ArgumentData`

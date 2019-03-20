@@ -95,6 +95,7 @@ TEST_CASE("Parsing test", "[parse]")
                          "subsubremove",   "--globalz=z1", "--globalz=z2", "--globalz=z3", NULL};
 
   parsed_data = parser.parse(argv3);
+  REQUIRE(parsed_data.has_action() == false);
   REQUIRE(parsed_data.get("remove") == true);
   REQUIRE(parsed_data.get("subremove") == true);
   REQUIRE(parsed_data.get("subsubremove") == true);
@@ -105,8 +106,8 @@ TEST_CASE("Parsing test", "[parse]")
 void
 test_method_1()
 {
-  global        = 0;
-  parser2.error = "error";
+  global = 0;
+  parser2.set_error("error");
   return;
 }
 
@@ -134,9 +135,11 @@ TEST_CASE("Invoke test", "[invoke]")
 
   const char *argv1[] = {"traffic_blabla", "func", NULL};
 
-  parser2.parse(argv1).invoke();
+  parsed_data = parser2.parse(argv1);
+  REQUIRE(parsed_data.has_action() == true);
+  parsed_data.invoke();
   REQUIRE(global == 0);
-  REQUIRE(parser2.error == "error");
+  REQUIRE(parser2.get_error() == "error");
 
   const char *argv2[] = {"traffic_blabla", "func2", NULL};
 

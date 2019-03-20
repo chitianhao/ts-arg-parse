@@ -31,20 +31,16 @@
 #include <string_view>
 
 // more than zero arguments
-static constexpr unsigned MORE_THAN_ZERO_ARG_N = ~0;
+constexpr unsigned MORE_THAN_ZERO_ARG_N = ~0;
 // more than one arguments
-static constexpr unsigned MORE_THAN_ONE_ARG_N = ~0 - 1;
+constexpr unsigned MORE_THAN_ONE_ARG_N = ~0 - 1;
 // customizable indent for help message
-static constexpr int INDENT_ONE   = 24;
-static constexpr int INDENT_TWO   = 32;
-static constexpr int INDENT_THREE = 46;
+constexpr int INDENT_ONE = 32;
+constexpr int INDENT_TWO = 46;
 
 namespace ts
 {
-// Some type def
-using StringArray = std::vector<std::string>;
-using Function    = std::function<void()>;
-
+using AP_StrVec = std::vector<std::string>;
 // The class holding both the ENV and String arguments
 class ArgumentData
 {
@@ -56,8 +52,8 @@ public:
   // return the Environment variable
   std::string const &env() const noexcept;
   // iterator for arguments
-  StringArray::const_iterator begin() const noexcept;
-  StringArray::const_iterator end() const noexcept;
+  AP_StrVec::const_iterator begin() const noexcept;
+  AP_StrVec::const_iterator end() const noexcept;
   // index accessing
   std::string const &at(unsigned index) const;
   // access the first index, equivalent to at(0)
@@ -72,7 +68,7 @@ private:
   // the environment variable
   std::string _env_value;
   // the arguments stored
-  StringArray _values;
+  AP_StrVec _values;
 
   friend class Arguments;
 };
@@ -97,13 +93,15 @@ public:
       @return The return value of the executed command (int).
   */
   void invoke();
+  // return true if there is any function to invoke
+  bool has_action() const;
 
 private:
   // A map of all the called parsed args/data
   // Key: "command/option", value: ENV and args
   std::map<std::string, ArgumentData> _data_map;
   // The function associated. invoke() will call this func
-  Function _action;
+  std::function<void()> _action;
 
   friend class ArgParser;
   friend class ArgumentData;
@@ -112,6 +110,8 @@ private:
 // Class of the ArgParser
 class ArgParser
 {
+  using Function = std::function<void()>;
+
 public:
   // Option structure: e.x. --arg -a
   // Contains all information about certain option(--switch)
@@ -154,6 +154,10 @@ public:
         @return The Command instance for chained calls.
     */
     Command &require_commands();
+    /** set the current command as default
+        @return The Command instance for chained calls.
+    */
+    Command &set_default();
 
   protected:
     // Main constructor called by add_command()
@@ -165,13 +169,15 @@ public:
     void check_command(std::string const &name, std::string const &key) const;
     // Helper method for ArgParser::help_message
     void output_command(std::ostream &out, std::string const &prefix) const;
+    // Helper method for ArgParser::help_message
+    void output_option() const;
     // Helper method for ArgParser::parse
-    bool parse(Arguments &ret, StringArray &args);
+    bool parse(Arguments &ret, AP_StrVec &args);
     // The help & version messages
     void help_message(std::string_view err = "") const;
     void version_message() const;
     // Helpr method for parse()
-    void append_option_data(Arguments &ret, StringArray &args, int index);
+    void append_option_data(Arguments &ret, AP_StrVec &args, int index);
     // The command name and help message
     std::string _name;
     std::string _description;
@@ -221,7 +227,8 @@ public:
                        std::string const &key = "");
   Command &add_command(std::string const &cmd_name, std::string const &cmd_description, std::string const &cmd_envvar,
                        unsigned cmd_arg_num, Function const &f = nullptr, std::string const &key = "");
-
+  // give a defaut command to this parser
+  void set_default_command(std::string const &cmd);
   /** Main parsing function
       @return The Arguments object available for program using
   */
@@ -234,14 +241,18 @@ public:
       @return The Command instance for chained calls.
   */
   Command &require_commands();
-  // user-customized error message output
-  std::string error;
+  // set the error message
+  void set_error(std::string e);
+  // get the error message
+  std::string get_error() const;
 
 protected:
   // Converted from 'const char **argv' for the use of parsing and help
-  StringArray _argv;
+  AP_StrVec _argv;
   // the top level command object for program use
   Command _top_level_command;
+  // user-customized error message output
+  std::string _error_msg;
 
   friend class Command;
   friend class Arguments;
